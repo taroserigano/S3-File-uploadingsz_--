@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs";
 import prisma from "@/utils/db";
 
 const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL;
@@ -46,8 +45,7 @@ async function forwardToAgenticService({
 }
 
 export async function POST(request) {
-  const { userId: clerkUserId } = auth();
-  const devUserHeader = request.headers.get("x-internal-user-id");
+  const userId = "guest";
   console.log(
     "[VAULT UPLOAD] clerkUserId:",
     clerkUserId,

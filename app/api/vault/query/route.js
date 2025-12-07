@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs";
 
 const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL;
 
 export async function POST(request) {
-  const { userId: clerkUserId } = auth();
-  const devUserHeader = request.headers.get("x-internal-user-id");
-  const userId = clerkUserId || devUserHeader;
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = "guest";
 
   if (!AGENTIC_SERVICE_URL) {
     return NextResponse.json(

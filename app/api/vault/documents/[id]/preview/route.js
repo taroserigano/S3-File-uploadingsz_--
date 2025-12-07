@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs";
 import prisma from "@/utils/db";
 
 const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL || "http://localhost:8000";
 
 export async function GET(request, { params }) {
-  const { userId } = auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = "guest";
 
   try {
     const { id } = params;

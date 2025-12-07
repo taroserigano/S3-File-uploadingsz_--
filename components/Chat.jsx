@@ -8,9 +8,8 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useAuth } from '@clerk/nextjs';
 const Chat = () => {
-  const { userId } = useAuth();
+  const userId = 'guest';
 
   const [text, setText] = useState('');
   const [messages, setMessages] = useState([]);

@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs";
 
 export async function POST(request) {
-  const { userId } = auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = "guest";
 
   try {
     const { query, answer } = await request.json();

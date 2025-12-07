@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
@@ -6,12 +5,8 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(request, { params }) {
   try {
-    const { userId } = auth();
+    const userId = "guest";
     console.log("DELETE request - Current userId:", userId);
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // In Next.js 14+, params might be a Promise
     const resolvedParams = await Promise.resolve(params);

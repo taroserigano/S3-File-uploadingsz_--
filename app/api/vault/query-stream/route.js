@@ -1,21 +1,9 @@
-import { auth } from "@clerk/nextjs";
-
 const AGENTIC_SERVICE_URL =
   process.env.AGENTIC_SERVICE_URL || "http://localhost:8000";
 
 export async function POST(request) {
   try {
-    // Authenticate user
-    const { userId: clerkUserId } = auth();
-    const devUserHeader = request.headers.get("x-internal-user-id");
-    const userId = clerkUserId || devUserHeader;
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: No user ID provided" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    const userId = "guest";
 
     // Parse request body
     const body = await request.json();

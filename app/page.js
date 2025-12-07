@@ -1,9 +1,6 @@
 import Link from "next/link";
-import { auth } from "@clerk/nextjs";
 
 const HomePage = () => {
-  const { userId } = auth();
-
   return (
     <div className="hero min-h-screen bg-base-200">
       <div className="hero-content text-center">
@@ -17,7 +14,7 @@ const HomePage = () => {
             *Click Get Started to begin planning your next adventure.
           </p>
           <Link
-            href={userId ? "/planner" : "/sign-in"}
+            href="/planner"
             className="btn btn-secondary"
           >
             Get Started

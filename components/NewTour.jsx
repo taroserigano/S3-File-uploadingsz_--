@@ -9,10 +9,9 @@ import {
 } from '@/utils/actions';
 import TourInfo from './TourInfo';
 import toast from 'react-hot-toast';
-import { useAuth } from '@clerk/nextjs';
 const NewTour = () => {
   const queryClient = useQueryClient();
-  const { userId } = useAuth();
+  const userId = 'guest';
   const {
     mutate,
     isPending,
