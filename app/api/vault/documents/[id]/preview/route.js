@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
-const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL || "http://localhost:8000";
+const VAULT_API_URL = process.env.VAULT_API_URL;
 
 export async function GET(request, { params }) {
   const userId = "guest";
@@ -38,12 +38,13 @@ export async function GET(request, { params }) {
     }
     
     const response = await fetch(
-      `${AGENTIC_SERVICE_URL}/api/v1/vault/preview/${id}?${queryParams.toString()}`,
+      `${VAULT_API_URL}/vault/preview/${id}?${queryParams.toString()}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
+        cache: "no-store",
       }
     );
 
@@ -56,7 +57,22 @@ export async function GET(request, { params }) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+
+    // Normalize to the shape the UI expects: { content, title?, chunk_count? }
+    return NextResponse.json(
+      {
+        content: data.preview || data.content || "",
+        title: data.title,
+        chunk_count: data.chunk_count,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching document preview:", error);
     return NextResponse.json(

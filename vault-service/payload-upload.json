@@ -1,0 +1,1 @@
+{"httpMethod":"POST","path":"/vault/upload","body":"{\"file\":\"SGVsbG8gVmF1bHQ=\",\"filename\":\"sample.txt\",\"documentId\":\"local-doc-1\",\"userId\":\"guest\",\"title\":\"Local Sample\",\"notes\":\"Test upload via sam local\"}"}

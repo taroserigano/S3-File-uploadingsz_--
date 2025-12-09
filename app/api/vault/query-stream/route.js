@@ -1,5 +1,4 @@
-const AGENTIC_SERVICE_URL =
-  process.env.AGENTIC_SERVICE_URL || "http://localhost:8000";
+const VAULT_API_URL = process.env.VAULT_API_URL;
 
 export async function POST(request) {
   try {
@@ -16,21 +15,18 @@ export async function POST(request) {
       );
     }
 
-    // Forward to FastAPI streaming endpoint
-    const response = await fetch(
-      `${AGENTIC_SERVICE_URL}/api/v1/vault/query-stream`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query,
-          user_id: userId,
-          top_k,
-        }),
-      }
-    );
+    // Call Lambda (non-streaming) and adapt to SSE expected by client
+    const response = await fetch(`${VAULT_API_URL}/vault/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query,
+        user_id: userId,
+        top_k,
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -43,8 +39,31 @@ export async function POST(request) {
       );
     }
 
-    // Forward the SSE stream to client
-    return new Response(response.body, {
+    const result = await response.json();
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (obj) => {
+          controller.enqueue(`data: ${JSON.stringify(obj)}\n\n`);
+        };
+
+        // Citations (sources)
+        if (result?.sources) {
+          send({ type: "citations", content: result.sources });
+        }
+
+        // Answer as single token payload
+        if (result?.answer) {
+          send({ type: "token", content: result.answer });
+        }
+
+        // Done signal
+        send({ type: "done" });
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

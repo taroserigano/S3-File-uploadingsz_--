@@ -1,0 +1,25 @@
+# SAM
+.aws-sam/
+samconfig.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AWS
+.env
+
+# Dependencies
+node_modules/

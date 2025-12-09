@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Knowledge Vault Service - Serverless RAG system with Lambda, S3, and DynamoDB
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment environment
+  
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Description: OpenAI API key for RAG generation
+
+  PineconeApiKey:
+    Type: String
+    NoEcho: true
+    Description: Pinecone API key for vector storage
+
+  PineconeIndexName:
+    Type: String
+    Default: vault-index
+    Description: Pinecone index name
+
+  PineconeCloud:
+    Type: String
+    Default: aws
+    AllowedValues:
+      - aws
+      - gcp
+    Description: Pinecone serverless cloud provider
+
+  PineconeRegion:
+    Type: String
+    Default: us-east-1
+    Description: Pinecone serverless region
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 3008
+    Runtime: python3.13
+    Environment:
+      Variables:
+        VAULT_BUCKET_NAME: !Ref VaultBucket
+        VAULT_TABLE_NAME: !Ref VaultTable
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+        PINECONE_API_KEY: !Ref PineconeApiKey
+        PINECONE_INDEX: !Ref PineconeIndexName
+        PINECONE_CLOUD: !Ref PineconeCloud
+        PINECONE_REGION: !Ref PineconeRegion
+        ENVIRONMENT: !Ref Environment
+
+Resources:
+  # S3 Bucket for document storage
+  VaultBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-vault-documents-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldDocuments
+            Status: Enabled
+            ExpirationInDays: 365
+      Tags:
+        - Key: Service
+          Value: KnowledgeVault
+        - Key: Environment
+          Value: !Ref Environment
+
+  # DynamoDB Table for embeddings and metadata
+  VaultTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-vault-chunks-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: chunk_id
+          AttributeType: S
+        - AttributeName: document_id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: chunk_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: document-index
+          KeySchema:
+            - AttributeName: document_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: user-index
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Service
+          Value: KnowledgeVault
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Function for Vault operations
+  VaultFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-vault-${Environment}'
+      CodeUri: .
+      Handler: lambda_handler.lambda_handler
+      Description: Knowledge Vault RAG service
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref VaultBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref VaultTable
+      Events:
+        UploadDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VaultApi
+            Path: /vault/upload
+            Method: POST
+        QueryVault:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VaultApi
+            Path: /vault/query
+            Method: POST
+        QueryStream:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VaultApi
+            Path: /vault/query-stream
+            Method: POST
+        PreviewDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VaultApi
+            Path: /vault/preview/{document_id}
+            Method: GET
+        Options:
+          Type: Api
+          Properties:
+            RestApiId: !Ref VaultApi
+            Path: /{proxy+}
+            Method: OPTIONS
+
+  # API Gateway
+  VaultApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-vault-api-${Environment}'
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET, POST, OPTIONS'"
+        AllowHeaders: "'Content-Type, Authorization'"
+        AllowOrigin: "'*'"
+      Auth:
+        ApiKeyRequired: false
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: Knowledge Vault API
+          version: 1.0.0
+        paths:
+          /vault/upload:
+            post:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VaultFunction.Arn}/invocations'
+              responses:
+                '200':
+                  description: Success
+          /vault/query:
+            post:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VaultFunction.Arn}/invocations'
+              responses:
+                '200':
+                  description: Success
+          /vault/query-stream:
+            post:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VaultFunction.Arn}/invocations'
+              responses:
+                '200':
+                  description: Success
+          /vault/preview/{document_id}:
+            get:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${VaultFunction.Arn}/invocations'
+              responses:
+                '200':
+                  description: Success
+
+  # CloudWatch Log Group
+  VaultLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${VaultFunction}'
+      RetentionInDays: 30
+
+Outputs:
+  VaultApiUrl:
+    Description: API Gateway endpoint URL for Knowledge Vault
+    Value: !Sub 'https://${VaultApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-VaultApiUrl'
+  
+  VaultBucketName:
+    Description: S3 bucket name for document storage
+    Value: !Ref VaultBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-VaultBucket'
+  
+  VaultTableName:
+    Description: DynamoDB table name for embeddings
+    Value: !Ref VaultTable
+    Export:
+      Name: !Sub '${AWS::StackName}-VaultTable'
+  
+  VaultFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt VaultFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VaultFunctionArn'

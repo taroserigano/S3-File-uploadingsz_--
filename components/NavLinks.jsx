@@ -1,8 +1,7 @@
 import Link from "next/link";
 
 const links = [
-  { href: "/planner", label: "travel planner" },
-  { href: "/planner/saved", label: "saved trips" },
+  { href: "/vault", label: "knowledge vault" },
 ];
 
 const NavLinks = () => {

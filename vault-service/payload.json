@@ -1,0 +1,1 @@
+{"httpMethod":"POST","path":"/vault/query","body":"{\"query\":\"test\",\"user_id\":\"guest\",\"top_k\":3}"}

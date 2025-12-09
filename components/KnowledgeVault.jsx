@@ -335,8 +335,15 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
       setPreviewError(null);
       setIsLoadingPreview(true);
 
-      // Fetch document content
-      const response = await fetch(`/api/vault/documents/${doc.id}/preview`);
+      // Fetch document content with cache busting
+      const cacheBuster = `t=${Date.now()}`;
+      const response = await fetch(`/api/vault/documents/${doc.id}/preview?${cacheBuster}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -344,6 +351,7 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
       }
 
       const data = await response.json();
+      console.log('Preview data received:', data); // Debug log
       setPreviewContent(data.content);
     } catch (error) {
       console.error("Preview error:", error);
@@ -867,14 +875,14 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
       {/* Document Preview Modal */}
       {showPreviewModal && previewDocument && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-5xl max-h-[90vh] flex flex-col">
-            <h3 className="font-bold text-lg mb-4">
+          <div className="modal-box w-11/12 max-w-6xl h-[95vh] flex flex-col p-6">
+            <h3 className="font-bold text-lg mb-4 flex-shrink-0">
               📄 {previewDocument.title}
             </h3>
 
-            <div className="space-y-4 flex-1 overflow-y-auto">
+            <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">
               {/* Document Metadata */}
-              <div className="bg-base-200 rounded-lg p-4">
+              <div className="bg-base-200 rounded-lg p-4 flex-shrink-0">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="font-semibold">Filename:</span>{" "}
@@ -929,7 +937,7 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
               </div>
 
               {/* Document Content Preview */}
-              <div className="bg-base-100 border border-base-300 rounded-lg p-4">
+              <div className="bg-base-100 border border-base-300 rounded-lg p-4 flex-shrink-0">
                 <h4 className="font-semibold mb-3">Document Content:</h4>
                 {isLoadingPreview ? (
                   <div className="flex items-center justify-center py-8">
@@ -954,8 +962,8 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
                     <span>{previewError}</span>
                   </div>
                 ) : previewContent ? (
-                  <div className="max-h-96 overflow-y-auto">
-                    <pre className="whitespace-pre-wrap text-sm font-mono bg-base-200 p-4 rounded border">
+                  <div className="bg-base-200/70 border rounded p-4 max-h-[50vh] overflow-auto">
+                    <pre className="whitespace-pre-wrap text-sm font-mono">
                       {previewContent}
                     </pre>
                   </div>
@@ -967,7 +975,7 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
               </div>
 
               {/* Document Stats */}
-              <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
+              <div className="stats stats-vertical lg:stats-horizontal shadow w-full flex-shrink-0">
                 <div className="stat">
                   <div className="stat-title">Total Chunks</div>
                   <div className="stat-value text-primary">
@@ -1013,7 +1021,7 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
               )}
             </div>
 
-            <div className="modal-action">
+            <div className="modal-action flex-shrink-0 mt-4">
               <button
                 className="btn"
                 onClick={() => {

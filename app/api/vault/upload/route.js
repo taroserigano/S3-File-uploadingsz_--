@@ -1,43 +1,57 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
-const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL;
+const VAULT_API_URL = process.env.VAULT_API_URL;
 
-async function forwardToAgenticService({
+async function forwardToVaultService({
   file,
   documentId,
   userId,
   title,
   notes,
 }) {
-  if (!AGENTIC_SERVICE_URL) {
+  if (!VAULT_API_URL) {
     throw new Error(
-      "AGENTIC_SERVICE_URL environment variable is not configured."
+      "VAULT_API_URL environment variable is not configured."
     );
   }
 
+  // Convert file to base64
   const arrayBuffer = await file.arrayBuffer();
-  const blob = new Blob([arrayBuffer], {
-    type: file.type || "application/octet-stream",
+  const buffer = Buffer.from(arrayBuffer);
+  const base64File = buffer.toString('base64');
+
+  // Send as JSON instead of multipart
+  const response = await fetch(`${VAULT_API_URL}/vault/upload`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      file: base64File,
+      filename: file.name || "document",
+      documentId,
+      userId,
+      title,
+      notes: notes || null,
+    }),
   });
-  const upstreamForm = new FormData();
-  upstreamForm.append("file", blob, file.name || "document");
-  upstreamForm.append("documentId", documentId);
-  upstreamForm.append("userId", userId);
-  upstreamForm.append("title", title);
-  if (notes) {
-    upstreamForm.append("notes", notes);
+
+  console.log("[VAULT UPLOAD] Response status:", response.status);
+  const responseText = await response.text();
+  console.log("[VAULT UPLOAD] Response body:", responseText);
+
+  let payload;
+  try {
+    payload = JSON.parse(responseText);
+  } catch (e) {
+    console.error("[VAULT UPLOAD] Failed to parse response:", responseText);
+    throw new Error(`Invalid response from vault service: ${responseText.substring(0, 100)}`);
   }
 
-  const response = await fetch(`${AGENTIC_SERVICE_URL}/api/v1/vault/upload`, {
-    method: "POST",
-    body: upstreamForm,
-  });
-
-  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const errorMessage =
-      payload?.detail || payload?.error || "Agentic ingestion failed.";
+      payload?.detail || payload?.error || "Vault ingestion failed.";
     throw new Error(errorMessage);
   }
 
@@ -46,13 +60,8 @@ async function forwardToAgenticService({
 
 export async function POST(request) {
   const userId = "guest";
-  console.log(
-    "[VAULT UPLOAD] clerkUserId:",
-    clerkUserId,
-    "devUserHeader:",
-    devUserHeader
-  );
-  const userId = clerkUserId || devUserHeader;
+  console.log("[VAULT UPLOAD] Using guest user");
+  
   if (!userId) {
     console.log("[VAULT UPLOAD] Auth failed - no userId");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -83,7 +92,7 @@ export async function POST(request) {
   });
 
   try {
-    const ingestionResult = await forwardToAgenticService({
+    const ingestionResult = await forwardToVaultService({
       file,
       documentId: documentRecord.id,
       userId,
@@ -113,9 +122,14 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("[VAULT UPLOAD] Error:", error);
+    console.error("[VAULT UPLOAD] Error message:", error?.message);
+    console.error("[VAULT UPLOAD] Error cause:", error?.cause);
+    
     const detail = error?.message?.includes("fetch failed")
-      ? `Agentic ingestion service is unreachable at ${AGENTIC_SERVICE_URL}.`
-      : error?.message;
+      ? `Vault ingestion service is unreachable at ${VAULT_API_URL}.`
+      : error?.message || "Unknown error";
+    
     await prisma.knowledgeDocument.update({
       where: { id: documentRecord.id },
       data: {
@@ -125,7 +139,7 @@ export async function POST(request) {
     });
 
     return NextResponse.json(
-      { error: "Upload failed", detail },
+      { error: "Upload failed", detail, fullError: error?.toString() },
       { status: 500 }
     );
   }

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-const AGENTIC_SERVICE_URL = process.env.AGENTIC_SERVICE_URL;
+const VAULT_API_URL = process.env.VAULT_API_URL;
 
 export async function POST(request) {
   const userId = "guest";
 
-  if (!AGENTIC_SERVICE_URL) {
+  if (!VAULT_API_URL) {
     return NextResponse.json(
-      { error: "Agentic service not configured" },
+      { error: "Vault service not configured" },
       { status: 500 }
     );
   }
@@ -22,7 +22,7 @@ export async function POST(request) {
       );
     }
 
-    const response = await fetch(`${AGENTIC_SERVICE_URL}/api/v1/vault/query`, {
+    const response = await fetch(`${VAULT_API_URL}/vault/query`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

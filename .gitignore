@@ -1,3 +1,93 @@
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Next.js
+.next/
+.next/**/trace
+.vercel
+out/
+env.local
+.env.local
+.env.*.local
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+ENV/
+env/
+.Python
+pip-wheel-metadata/
+
+# Poetry
+poetry.lock
+
+# AWS SAM / build artifacts
+.aws-sam/
+.build/
+*.zip
+
+# Lambda build artifact folders
+dist/
+build/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+# Pytest
+.pytest_cache/
+
+# IDE configs
+*.iml
+*.ipr
+*.iws
+
+# Database
+*.sqlite3
+
+# Secrets and credentials
+*.pem
+*.key
+.env
+.env.*
+
+# Prisma
+/prisma/.env
+
+# Misc
+.DS_Store
+*.log
+
+# Uploaded files and local data
+/vault-service/data/
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -108,3 +198,6 @@ agentic-service/*.log
 # Node modules in agentic-service
 agentic-service/node_modules/
 .env.production
+.bashrc
+.bash_profile
+.bash_history
