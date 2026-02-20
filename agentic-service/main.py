@@ -1,7 +1,14 @@
 """
 FastAPI entrypoint for agentic travel planner service.
 Exposes endpoints for multi-agent itinerary generation.
+
+Performance features:
+  - SSE streaming endpoint for progressive itinerary display
+  - In-memory + Redis caching (cache_service)
+  - Pre-warm background task for top 50 destinations
+  - Cache stats monitoring endpoint
 """
+import asyncio
 import logging
 import sys
 import typing
@@ -15,6 +22,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 from config import settings
+from services.cache_service import cache_stats as _cache_stats
 
 # Initialize logging before any code that might raise exceptions
 logging.basicConfig(level=logging.INFO)
@@ -87,6 +95,64 @@ else:
     planner = None
 
 vault_service = VaultIngestionService() if VaultIngestionService else None
+
+# ---------------------------------------------------------------------------
+# Pre-warm popular destinations on startup
+# ---------------------------------------------------------------------------
+TOP_DESTINATIONS = [
+    ("Tokyo", "Japan"), ("Paris", "France"), ("London", "United Kingdom"),
+    ("New York", "USA"), ("Rome", "Italy"), ("Barcelona", "Spain"),
+    ("Bangkok", "Thailand"), ("Dubai", "UAE"), ("Singapore", "Singapore"),
+    ("Istanbul", "Turkey"), ("Amsterdam", "Netherlands"), ("Seoul", "South Korea"),
+    ("Sydney", "Australia"), ("Hong Kong", "China"), ("Prague", "Czech Republic"),
+    ("Lisbon", "Portugal"), ("Berlin", "Germany"), ("Vienna", "Austria"),
+    ("Florence", "Italy"), ("Kyoto", "Japan"), ("Bali", "Indonesia"),
+    ("Marrakech", "Morocco"), ("Athens", "Greece"), ("Buenos Aires", "Argentina"),
+    ("Mexico City", "Mexico"), ("Cairo", "Egypt"), ("Reykjavik", "Iceland"),
+    ("Cape Town", "South Africa"), ("Mumbai", "India"), ("Havana", "Cuba"),
+    ("Rio de Janeiro", "Brazil"), ("Hanoi", "Vietnam"), ("Taipei", "Taiwan"),
+    ("Zurich", "Switzerland"), ("Edinburgh", "United Kingdom"), ("Dublin", "Ireland"),
+    ("Copenhagen", "Denmark"), ("Stockholm", "Sweden"), ("Oslo", "Norway"),
+    ("Helsinki", "Finland"), ("Kuala Lumpur", "Malaysia"), ("Osaka", "Japan"),
+    ("Los Angeles", "USA"), ("San Francisco", "USA"), ("Chicago", "USA"),
+    ("Miami", "USA"), ("Cancun", "Mexico"), ("Santorini", "Greece"),
+    ("Phuket", "Thailand"), ("Queenstown", "New Zealand"),
+]
+
+
+async def _prewarm_destinations():
+    """Background task: pre-generate itineraries for popular destinations.
+    Uses a semaphore to batch 5 at a time for faster warm-up."""
+    if planner is None:
+        logger.warning("Skipping pre-warm: planner unavailable")
+        return
+    logger.info(f"Starting pre-warm for {len(TOP_DESTINATIONS)} destinations...")
+    sem = asyncio.Semaphore(5)
+    warmed = 0
+
+    async def _warm_one(city: str, country: str):
+        nonlocal warmed
+        async with sem:
+            try:
+                await planner.generate_itinerary(
+                    city=city, country=country, days=3,
+                    budget=None, preferences={}, user_id="prewarm",
+                )
+                warmed += 1
+            except Exception as exc:
+                logger.warning(f"Pre-warm failed for {city}: {exc}")
+            await asyncio.sleep(0.2)  # small delay per task to avoid rate-limiting
+
+    await asyncio.gather(*[_warm_one(c, co) for c, co in TOP_DESTINATIONS])
+    logger.info(f"Pre-warm complete: {warmed}/{len(TOP_DESTINATIONS)} destinations cached")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Fire-and-forget pre-warm task on startup."""
+    # Disabled during development to avoid rate-limiting user requests
+    # asyncio.create_task(_prewarm_destinations())
+    logger.info("Pre-warm disabled (enable in production)")
 
 
 class PlanRequest(BaseModel):
@@ -261,13 +327,53 @@ async def generate_itinerary(request: GenerateItineraryRequest):
         ) from exc
 
 
+@app.post("/api/v1/agentic/generate-itinerary-stream")
+async def generate_itinerary_stream(request: GenerateItineraryRequest):
+    """
+    Streaming SSE endpoint for itinerary generation.
+
+    Events emitted:
+      event: status   -> {"phase": "starting|generating_itinerary|fetching_travel_data|cache_hit"}
+      event: chunk    -> {"text": "..."} (incremental LLM tokens)
+      event: result   -> {full itinerary JSON}
+      event: done     -> {}
+    """
+    if planner is None:
+        raise HTTPException(status_code=503, detail="Planner unavailable")
+
+    preferences_dict = {}
+    if request.preferences:
+        for pref in request.preferences:
+            preferences_dict[pref] = True
+
+    async def event_generator():
+        async for chunk in planner.generate_itinerary_stream(
+            city=request.city,
+            country=request.country,
+            days=request.days,
+            budget=request.budget,
+            preferences=preferences_dict,
+            user_id=request.user_id,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/api/v1/agentic/refine-itinerary")
 async def refine_itinerary(request: RefineItineraryRequest):
     """
     Refine an existing itinerary based on user feedback.
     
-    Takes the current itinerary and a refinement request (e.g., "Make day 2 less busy")
-    and uses the AI to update the itinerary accordingly.
+    Actually applies the LLM response to update the itinerary.
     """
     if planner is None:
         detail = "Planner stack is unavailable. Check server logs."
@@ -276,41 +382,49 @@ async def refine_itinerary(request: RefineItineraryRequest):
         raise HTTPException(status_code=503, detail=detail)
     
     try:
+        import json as _json
+
         logger.info(
             f"[Refine] Refining itinerary {request.run_id} "
             f"for user {request.user_id}: {request.refinement}"
         )
         
-        # Use the OpenAI LLM to refine the itinerary
-        from langchain.schema import HumanMessage, SystemMessage
-        
-        system_prompt = """You are a travel planning assistant. You receive an existing itinerary 
-        and a refinement request. Your job is to update the itinerary according to the request while
-        preserving the overall structure and quality. Return the updated itinerary in the same JSON format."""
-        
-        user_prompt = f"""Current Itinerary:
-{request.current_itinerary}
-
-Refinement Request: {request.refinement}
-
-Please update the itinerary to incorporate this change. Return the complete updated itinerary."""
-        
-        response = await planner.openai_llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ])
-        
-        # Parse the response and construct the updated result
-        # For now, we'll return a modified version of the current itinerary
-        refined_tour = request.current_itinerary.copy()
-        refined_tour["description"] = (
-            f"{refined_tour.get('description', '')} (Refined: {request.refinement})"
+        system_prompt = (
+            "You are a travel planning assistant. Update the itinerary below according to the "
+            "user's refinement request. Preserve the JSON structure exactly. Return ONLY valid JSON."
         )
+        
+        user_prompt = (
+            f"Current Itinerary:\n{_json.dumps(request.current_itinerary)}\n\n"
+            f"Refinement Request: {request.refinement}\n\n"
+            f"Return the complete updated itinerary as JSON."
+        )
+        
+        response = await planner.openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.5,
+            max_tokens=3000,
+            response_format={"type": "json_object"},
+        )
+        
+        content = response.choices[0].message.content.strip()
+        try:
+            refined_tour = _json.loads(content)
+        except _json.JSONDecodeError:
+            # Fallback: keep original with note
+            refined_tour = request.current_itinerary.copy()
+            refined_tour["description"] = (
+                f"{refined_tour.get('description', '')} (Refined: {request.refinement})"
+            )
         
         result = {
             "run_id": request.run_id,
             "tour": refined_tour,
-            "cost": {"llm_tokens": 500, "api_calls": 1, "total_usd": 0.05},
+            "cost": {"llm_tokens": 500, "api_calls": 1, "total_usd": 0.01},
             "citations": ["AI refinement based on user feedback"],
             "status": "completed"
         }
@@ -324,6 +438,12 @@ Please update the itinerary to incorporate this change. Return the complete upda
             status_code=500,
             detail=f"Failed to refine itinerary: {str(exc)}"
         ) from exc
+
+
+@app.get("/api/v1/cache/stats")
+async def get_cache_stats():
+    """Return cache hit/miss statistics and sizes."""
+    return _cache_stats()
 
 
 @app.post("/api/v1/vault/upload")
@@ -517,6 +637,44 @@ async def preview_vault_document(
     except Exception as exc:  # noqa: BLE001
         logger.error("Vault preview failed", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Preview failed: {str(exc)}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Streaming-aware plan endpoint (mirrors /api/agentic/plan but streams)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/agentic/plan-stream")
+async def create_plan_stream(request: PlanRequest):
+    """Streaming version of /api/agentic/plan."""
+    if planner is None:
+        raise HTTPException(status_code=503, detail="Planner unavailable")
+
+    prefs = request.preferences or {}
+    if isinstance(prefs, list):
+        prefs = {p: True for p in prefs}
+    elif isinstance(prefs, dict):
+        pass  # already correct
+
+    async def event_generator():
+        async for chunk in planner.generate_itinerary_stream(
+            city=request.city,
+            country=request.country,
+            days=request.days,
+            budget=request.budget,
+            preferences=prefs,
+            user_id=request.user_id,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 if __name__ == "__main__":

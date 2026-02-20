@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 
 const TravelAgent = ({ userId }) => {
@@ -24,6 +24,10 @@ const TravelAgent = ({ userId }) => {
   const [agentLogs, setAgentLogs] = useState([]);
   const [error, setError] = useState(null);
 
+  // Streaming state
+  const [streamChunks, setStreamChunks] = useState("");
+  const abortRef = useRef(null);
+
   // Refinement chat state
   const [refinementQuery, setRefinementQuery] = useState("");
   const [isRefining, setIsRefining] = useState(false);
@@ -39,6 +43,9 @@ const TravelAgent = ({ userId }) => {
     }));
   };
 
+  // ---------------------------------------------------------------
+  // SSE streaming trip generation
+  // ---------------------------------------------------------------
   const handleGenerateTrip = async (e) => {
     e.preventDefault();
 
@@ -46,7 +53,6 @@ const TravelAgent = ({ userId }) => {
       toast.error("Please enter a destination");
       return;
     }
-
     if (days < 1 || days > 30) {
       toast.error("Trip duration must be between 1 and 30 days");
       return;
@@ -57,17 +63,23 @@ const TravelAgent = ({ userId }) => {
       setError(null);
       setAgentLogs([]);
       setItinerary(null);
+      setStreamChunks("");
+
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       setAgentLogs((prev) => [
         ...prev,
-        { agent: "system", message: "🚀 Initializing multi-agent planning system...", timestamp: new Date() },
+        {
+          agent: "system",
+          message: "Initializing multi-agent planning system...",
+          timestamp: new Date(),
+        },
       ]);
 
-      const response = await fetch("/api/travel/generate", {
+      const response = await fetch("/api/travel/generate/stream", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           city: destination,
           country: country || "Auto-detect",
@@ -76,28 +88,110 @@ const TravelAgent = ({ userId }) => {
           preferences: Object.keys(preferences).filter((k) => preferences[k]),
           user_id: userId,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate trip");
+        // Fall back to non-streaming endpoint
+        const fallbackRes = await fetch("/api/travel/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            city: destination,
+            country: country || "Auto-detect",
+            days: parseInt(days),
+            budget: budget ? parseFloat(budget) : null,
+            preferences: Object.keys(preferences).filter(
+              (k) => preferences[k]
+            ),
+            user_id: userId,
+          }),
+        });
+        if (!fallbackRes.ok) {
+          const errorData = await fallbackRes.json();
+          throw new Error(errorData.error || "Failed to generate trip");
+        }
+        const data = await fallbackRes.json();
+        setItinerary(data);
+        setAgentLogs((prev) => [
+          ...prev,
+          {
+            agent: "supervisor",
+            message: "Planning workflow completed",
+            timestamp: new Date(),
+          },
+        ]);
+        toast.success("Trip plan generated successfully!");
+        return;
       }
 
-      const data = await response.json();
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      setAgentLogs((prev) => [
-        ...prev,
-        { agent: "supervisor", message: "✅ Planning workflow completed", timestamp: new Date() },
-      ]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      setItinerary(data);
-      toast.success("Trip plan generated successfully!");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.slice(6);
+            try {
+              const data = JSON.parse(dataStr);
+
+              if (data.phase) {
+                const phaseMessages = {
+                  starting: "Planning workflow initialized",
+                  generating_itinerary:
+                    "AI agents generating itinerary...",
+                  fetching_travel_data:
+                    "Fetching real-time travel data from Amadeus...",
+                  cache_hit:
+                    "Found cached itinerary — loading instantly!",
+                };
+                setAgentLogs((prev) => [
+                  ...prev,
+                  {
+                    agent: "supervisor",
+                    message: phaseMessages[data.phase] || data.phase,
+                    timestamp: new Date(),
+                  },
+                ]);
+              } else if (data.text !== undefined) {
+                setStreamChunks((prev) => prev + data.text);
+              } else if (data.tour) {
+                setItinerary(data);
+                setAgentLogs((prev) => [
+                  ...prev,
+                  {
+                    agent: "supervisor",
+                    message: "Planning workflow completed",
+                    timestamp: new Date(),
+                  },
+                ]);
+                toast.success("Trip plan generated successfully!");
+              } else if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseErr) {
+              // Skip unparseable
+            }
+          }
+        }
+      }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Generation error:", err);
       setError(err.message);
       toast.error("Failed to generate trip plan");
     } finally {
       setIsGenerating(false);
+      abortRef.current = null;
     }
   };
 
@@ -334,6 +428,21 @@ const TravelAgent = ({ userId }) => {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Streaming Preview */}
+          {isGenerating && streamChunks && (
+            <div className="card bg-base-100 shadow-xl mb-6">
+              <div className="card-body">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="loading loading-dots loading-xs"></span>
+                  <h3 className="card-title text-lg">Building Your Itinerary...</h3>
+                </div>
+                <pre className="text-xs text-base-content/60 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto bg-base-200 p-3 rounded-lg">
+                  {streamChunks.slice(-800)}
+                </pre>
               </div>
             </div>
           )}

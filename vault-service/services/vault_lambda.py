@@ -16,7 +16,6 @@ import boto3
 from pypdf import PdfReader
 from docx import Document as DocxDocument
 from openai import OpenAI
-from pinecone import Pinecone, ServerlessSpec
 
 # AWS clients
 s3_client = boto3.client('s3')
@@ -26,10 +25,6 @@ dynamodb = boto3.resource('dynamodb')
 BUCKET_NAME = os.environ.get('VAULT_BUCKET_NAME')
 TABLE_NAME = os.environ.get('VAULT_TABLE_NAME')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
-PINECONE_INDEX = os.environ.get('PINECONE_INDEX', 'vault-index')
-PINECONE_CLOUD = os.environ.get('PINECONE_CLOUD', 'aws')
-PINECONE_REGION = os.environ.get('PINECONE_REGION', 'us-east-1')
 
 # Initialize OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
@@ -52,36 +47,8 @@ class VaultService:
         else:
             self.table = None
             logger.warning("VAULT_TABLE_NAME not set")
-
-        # Pinecone index client with better error handling
-        if not PINECONE_API_KEY:
-            raise ValueError("PINECONE_API_KEY is required for vector storage")
-
-        try:
-            logger.info(f"Initializing Pinecone with index={PINECONE_INDEX}, cloud={PINECONE_CLOUD}, region={PINECONE_REGION}")
-            pc = Pinecone(api_key=PINECONE_API_KEY)
-            
-            # List existing indexes
-            existing_indexes = [idx['name'] for idx in pc.list_indexes()]
-            logger.info(f"Existing Pinecone indexes: {existing_indexes}")
-            
-            if PINECONE_INDEX not in existing_indexes:
-                logger.info(f"Creating new Pinecone index: {PINECONE_INDEX}")
-                pc.create_index(
-                    name=PINECONE_INDEX,
-                    dimension=self.dimension,
-                    metric='cosine',
-                    spec=ServerlessSpec(cloud=PINECONE_CLOUD, region=PINECONE_REGION)
-                )
-                # Wait for index to be ready
-                import time
-                time.sleep(5)
-
-            self.pinecone_index = pc.Index(PINECONE_INDEX)
-            logger.info("Pinecone index initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize Pinecone: {e}", exc_info=True)
-            raise
+        # No external vector store configured (Pinecone was removed)
+        self.pinecone_index = None
     
     def ingest_document(
         self,
@@ -141,24 +108,8 @@ class VaultService:
                 's3_key': s3_key
             })
 
-        # Upsert vectors into Pinecone
-        vectors = []
-        for idx, embedding in enumerate(embeddings):
-            vector_id = f"{document_id}#{idx}"
-            metadata = {
-                'document_id': document_id,
-                'chunk_index': idx,
-                'title': title,
-                'user_id': user_id
-            }
-            vectors.append({
-                'id': vector_id,
-                'values': embedding,
-                'metadata': metadata
-            })
-
-        if vectors:
-            self.pinecone_index.upsert(vectors=vectors)
+        # Vectors previously sent to Pinecone; now stored only in DynamoDB.
+        # Embeddings are saved in DynamoDB above; no external vector upsert performed.
         
         token_estimate = math.ceil(len(text) / 4)
         
@@ -180,47 +131,66 @@ class VaultService:
         # Embed query using OpenAI
         query_embedding = self._generate_embeddings([query])[0]
 
-        # Query Pinecone for nearest neighbors
-        pc_result = self.pinecone_index.query(
-            vector=query_embedding,
-            top_k=top_k,
-            include_metadata=True
-        )
-
-        matches = pc_result.get('matches', []) if isinstance(pc_result, dict) else pc_result.matches
-
-        if not matches:
+        # Fall back to DynamoDB-based similarity search (no Pinecone)
+        if not self.table:
             return {
                 'answer': 'No documents found in your knowledge vault.',
                 'sources': [],
                 'raw_chunks': []
             }
 
+        # Scan table and compute cosine similarity against stored embeddings
+        results = []
+        scan_kwargs = { 'ProjectionExpression': 'chunk_id, document_id, chunk_index, title, text, embedding' }
+        done = False
+        start_key = None
+        while not done:
+            if start_key:
+                scan_kwargs['ExclusiveStartKey'] = start_key
+            response = self.table.scan(**scan_kwargs)
+            items = response.get('Items', [])
+            for item in items:
+                emb = item.get('embedding')
+                if not emb:
+                    continue
+                # convert Decimal to float
+                try:
+                    vec = [float(x) for x in emb]
+                except Exception:
+                    continue
+                score = self._cosine_similarity(query_embedding, vec)
+                results.append((score, item))
+
+            start_key = response.get('LastEvaluatedKey')
+            done = start_key is None
+
+        if not results:
+            return {
+                'answer': 'No documents found in your knowledge vault.',
+                'sources': [],
+                'raw_chunks': []
+            }
+
+        # take top_k matches by score
+        results.sort(key=lambda x: x[0], reverse=True)
+        top = results[:top_k]
+
         contexts: List[str] = []
         sources: List[Dict[str, Any]] = []
         raw_chunks: List[str] = []
 
-        for match in matches:
-            metadata = match.get('metadata', {}) if isinstance(match, dict) else match.metadata
-            document_id = metadata.get('document_id')
-            chunk_index = metadata.get('chunk_index')
-
-            if document_id is None or chunk_index is None:
-                continue
-
-            chunk_id = f"{document_id}#{chunk_index}"
-            item = self.table.get_item(Key={'chunk_id': chunk_id}).get('Item', {}) if self.table else {}
-            if not item:
-                continue
-
-            title = item.get('title', metadata.get('title', 'Untitled'))
+        for score, item in top:
+            document_id = item.get('document_id')
+            chunk_index = item.get('chunk_index')
+            title = item.get('title', 'Untitled')
             text = item.get('text', '')
 
             contexts.append(f"Document: {title}\n{text}")
             sources.append({
                 'document_id': document_id,
                 'title': title,
-                'chunk_index': chunk_index
+                'chunk_index': chunk_index,
+                'score': score
             })
             raw_chunks.append(text)
 

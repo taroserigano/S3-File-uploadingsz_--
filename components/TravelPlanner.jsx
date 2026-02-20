@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 
 const TravelPlanner = ({ userId }) => {
@@ -24,6 +24,11 @@ const TravelPlanner = ({ userId }) => {
   const [error, setError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Streaming state
+  const [streamPhase, setStreamPhase] = useState("");
+  const [streamChunks, setStreamChunks] = useState("");
+  const abortRef = useRef(null);
+
   const handlePreferenceToggle = (pref) => {
     setPreferences((prev) => ({
       ...prev,
@@ -31,6 +36,9 @@ const TravelPlanner = ({ userId }) => {
     }));
   };
 
+  // ---------------------------------------------------------------
+  // SSE streaming trip generation
+  // ---------------------------------------------------------------
   const handlePlanTrip = async (e) => {
     e.preventDefault();
 
@@ -38,7 +46,6 @@ const TravelPlanner = ({ userId }) => {
       toast.error("Please enter a destination");
       return;
     }
-
     if (days < 1 || days > 30) {
       toast.error("Trip duration must be between 1 and 30 days");
       return;
@@ -46,34 +53,116 @@ const TravelPlanner = ({ userId }) => {
 
     setIsLoading(true);
     setError(null);
+    setStreamPhase("connecting");
+    setStreamChunks("");
+    setTripData(null);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      const response = await fetch("/api/travel/planner", {
+      const response = await fetch("/api/travel/planner/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destination,
-          country,
-          days,
-          budget,
-          preferences,
-        }),
+        body: JSON.stringify({ destination, country, days, budget, preferences }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate trip plan");
+        // Fall back to non-streaming endpoint
+        const fallbackRes = await fetch("/api/travel/planner", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ destination, country, days, budget, preferences }),
+        });
+        if (!fallbackRes.ok) {
+          const errData = await fallbackRes.json();
+          throw new Error(errData.error || "Failed to generate trip plan");
+        }
+        const data = await fallbackRes.json();
+        setTripData(data);
+        toast.success("Trip plan generated!");
+        return;
       }
 
-      const data = await response.json();
-      setTripData(data);
-      toast.success("Trip plan generated!");
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            const eventType = line.slice(7).trim();
+            // Next line should be data
+            continue;
+          }
+          if (line.startsWith("data: ")) {
+            const dataStr = line.slice(6);
+            try {
+              const data = JSON.parse(dataStr);
+
+              // Determine event type from the last seen event line
+              if (data.phase) {
+                setStreamPhase(data.phase);
+                if (data.phase === "cache_hit") {
+                  setStreamPhase("complete");
+                }
+              } else if (data.text !== undefined) {
+                setStreamChunks((prev) => prev + data.text);
+              } else if (data.tour) {
+                // Final result
+                // Transform for TravelPlanner expected format
+                const tour = data.tour;
+                if (tour.daily_plans) {
+                  tour.daily_plans = tour.daily_plans.map((day) => ({
+                    ...day,
+                    title: day.theme || day.title,
+                    activities: (day.plan || day.activities || []).map((activity) => ({
+                      time: activity.time,
+                      name: activity.activity || activity.name,
+                      description: activity.notes || activity.description,
+                      location:
+                        typeof activity.location === "string"
+                          ? { address: activity.location, type: "location" }
+                          : activity.location,
+                      duration: activity.duration,
+                      estimated_duration: activity.duration,
+                    })),
+                  }));
+                }
+                setTripData({
+                  itinerary: tour,
+                  run_id: data.run_id,
+                  cost: data.cost,
+                  metadata: { destination, country, days, budget, preferences },
+                });
+                setStreamPhase("complete");
+                toast.success("Trip plan generated!");
+              } else if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseErr) {
+              // Skip unparseable lines
+            }
+          }
+        }
+      }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Error generating trip:", err);
       setError(err.message);
       toast.error(err.message);
     } finally {
       setIsLoading(false);
+      abortRef.current = null;
     }
   };
 
@@ -153,17 +242,27 @@ const TravelPlanner = ({ userId }) => {
                             <div className="flex items-start gap-2">
                               <span className="text-base">📍</span>
                               <div className="flex-1">
-                                {activity.location.cuisine && (
-                                  <p className="font-bold text-base mb-1">
-                                    {activity.name}
+                                {/* Place name — shown when the AI returns a location object with a name field */}
+                                {activity.location.name && (
+                                  <p className="font-semibold text-sm">
+                                    {activity.location.name}
                                   </p>
                                 )}
-                                <p className="font-semibold text-sm">
-                                  {activity.location.address}
-                                </p>
-                                {/* Address shown above. Removed type to avoid redundant label. */}
+                                {/* Exact street address — shown as muted secondary text when it differs from the name */}
+                                {activity.location.address &&
+                                  activity.location.address !== activity.location.name && (
+                                    <p className="text-xs text-base-content/50 mt-0.5">
+                                      {activity.location.address}
+                                    </p>
+                                  )}
+                                {/* Fallback: old format where only address string exists */}
+                                {!activity.location.name && activity.location.address && (
+                                  <p className="font-semibold text-sm">
+                                    {activity.location.address}
+                                  </p>
+                                )}
                                 {activity.location.cuisine && (
-                                  <p className="text-xs text-base-content/60">
+                                  <p className="text-xs text-base-content/60 mt-1">
                                     Cuisine: {activity.location.cuisine} •{" "}
                                     {activity.location.priceRange}
                                   </p>
@@ -448,13 +547,35 @@ const TravelPlanner = ({ userId }) => {
                   {isLoading ? (
                     <>
                       <span className="loading loading-spinner"></span>
-                      Generating Your Perfect Trip...
+                      {streamPhase === "connecting" && "Connecting..."}
+                      {streamPhase === "starting" && "Starting AI planner..."}
+                      {streamPhase === "generating_itinerary" &&
+                        "Generating itinerary..."}
+                      {streamPhase === "fetching_travel_data" &&
+                        "Fetching travel data..."}
+                      {streamPhase === "cache_hit" && "Loading cached plan..."}
+                      {!streamPhase && "Generating Your Perfect Trip..."}
                     </>
                   ) : (
                     "Generate Trip Plan"
                   )}
                 </button>
               </form>
+
+              {/* Streaming preview */}
+              {isLoading && streamChunks && (
+                <div className="mt-4 p-4 bg-base-200 rounded-lg max-h-48 overflow-y-auto">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="loading loading-dots loading-xs"></span>
+                    <span className="text-sm font-semibold text-primary">
+                      Building your itinerary...
+                    </span>
+                  </div>
+                  <pre className="text-xs text-base-content/60 whitespace-pre-wrap font-mono">
+                    {streamChunks.slice(-500)}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
         )}

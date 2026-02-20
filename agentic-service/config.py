@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     amadeus_api_key: Optional[str] = None
     amadeus_api_secret: Optional[str] = None
     openweather_api_key: Optional[str] = None
+    unsplash_access_key: Optional[str] = None
+
+    # Redis (optional – falls back to in-memory LRU when unavailable)
+    redis_url: Optional[str] = None  # e.g. redis://localhost:6379/0
+    cache_ttl_seconds: int = 86400  # 24 hours
 
 
 settings = Settings()

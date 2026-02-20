@@ -16,29 +16,6 @@ Parameters:
     NoEcho: true
     Description: OpenAI API key for RAG generation
 
-  PineconeApiKey:
-    Type: String
-    NoEcho: true
-    Description: Pinecone API key for vector storage
-
-  PineconeIndexName:
-    Type: String
-    Default: vault-index
-    Description: Pinecone index name
-
-  PineconeCloud:
-    Type: String
-    Default: aws
-    AllowedValues:
-      - aws
-      - gcp
-    Description: Pinecone serverless cloud provider
-
-  PineconeRegion:
-    Type: String
-    Default: us-east-1
-    Description: Pinecone serverless region
-
 Globals:
   Function:
     Timeout: 900
@@ -49,10 +26,7 @@ Globals:
         VAULT_BUCKET_NAME: !Ref VaultBucket
         VAULT_TABLE_NAME: !Ref VaultTable
         OPENAI_API_KEY: !Ref OpenAIApiKey
-        PINECONE_API_KEY: !Ref PineconeApiKey
-        PINECONE_INDEX: !Ref PineconeIndexName
-        PINECONE_CLOUD: !Ref PineconeCloud
-        PINECONE_REGION: !Ref PineconeRegion
+        # Pinecone parameters removed during rollback
         ENVIRONMENT: !Ref Environment
 
 Resources:

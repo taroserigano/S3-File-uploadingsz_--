@@ -1,7 +1,9 @@
 """
 Amadeus API integration for real travel data.
 Provides flight search, hotel search, and travel recommendations.
+Async wrappers use asyncio.to_thread() to avoid blocking the event loop.
 """
+import asyncio
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -241,6 +243,17 @@ class AmadeusService:
         }
         
         return city_airports.get(city_name.lower())
+
+    # ------------------------------------------------------------------
+    # Async wrappers – offload blocking Amadeus SDK calls to a thread
+    # ------------------------------------------------------------------
+    async def async_search_flights(self, **kwargs) -> Dict[str, Any]:
+        """Non-blocking wrapper around search_flights."""
+        return await asyncio.to_thread(self.search_flights, **kwargs)
+
+    async def async_search_hotels(self, **kwargs) -> Dict[str, Any]:
+        """Non-blocking wrapper around search_hotels."""
+        return await asyncio.to_thread(self.search_hotels, **kwargs)
 
 
 # Global instance

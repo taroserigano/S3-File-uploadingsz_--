@@ -2,8 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "Building Lambda..." -ForegroundColor Cyan
-$env:PINECONE_API_KEY = "pcsk_4rkikq_27ETYz7ZyxYj3gH7Rb2SKkw8418Z1LGUdCXgTeUHNhXowh3WUE557HahSCZ7dRe"
-
+# Pinecone API key removed during rollback; set required envs manually if needed
 sam build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed!" -ForegroundColor Red

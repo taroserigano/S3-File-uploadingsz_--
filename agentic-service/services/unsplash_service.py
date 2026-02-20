@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 class UnsplashService:
     """Service for fetching images from Unsplash API."""
     
-    def __init__(self):
-        self.access_key = os.getenv("UNSPLASH_ACCESS_KEY")
+    def __init__(self, access_key: str = None):
+        # Accept explicit key, fall back to env vars
+        self.access_key = (
+            access_key
+            or os.getenv("UNSPLASH_ACCESS_KEY")
+            or os.getenv("UNSPLASH_API_KEY")
+        )
         self.base_url = "https://api.unsplash.com"
         
         if not self.access_key:
@@ -128,5 +133,9 @@ class UnsplashService:
             logger.warning(f"Failed to trigger Unsplash download tracking: {e}")
 
 
-# Global instance
-unsplash_service = UnsplashService()
+# Global instance (key resolved lazily via settings or env)
+try:
+    from config import settings as _settings
+    unsplash_service = UnsplashService(access_key=_settings.unsplash_access_key)
+except Exception:
+    unsplash_service = UnsplashService()

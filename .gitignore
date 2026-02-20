@@ -198,6 +198,6 @@ agentic-service/*.log
 # Node modules in agentic-service
 agentic-service/node_modules/
 .env.production
-.bashrc
 .bash_profile
 .bash_history
+vault-service/env.local.json
