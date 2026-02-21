@@ -47,16 +47,13 @@ except Exception as vault_error:
 
 try:
     from agents.simple_planner import SimplePlanner as AgenticPlanner
-except Exception as planner_import_error:  # noqa: BLE001
-    try:
-        from agents.planner import AgenticPlanner
-    except Exception:
-        AgenticPlanner = None  # type: ignore[assignment]
-        planner_initialization_error: Optional[Exception] = planner_import_error
-    else:
-        planner_initialization_error: Optional[Exception] = None
-else:
     planner_initialization_error: Optional[Exception] = None
+except Exception as planner_import_error:  # noqa: BLE001
+    # planner.py (LangGraph multi-agent) is stub code — don't import it
+    # as it needlessly loads LangGraph, LangChain, and heavy deps.
+    AgenticPlanner = None  # type: ignore[assignment]
+    planner_initialization_error: Optional[Exception] = planner_import_error
+    logger.error(f"SimplePlanner import failed: {planner_import_error}")
 
 app = FastAPI(
     title="Agentic Travel Planner",
@@ -407,7 +404,7 @@ async def refine_itinerary(request: RefineItineraryRequest):
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,
-            max_tokens=3000,
+            max_tokens=16000,
             response_format={"type": "json_object"},
         )
         
@@ -639,42 +636,7 @@ async def preview_vault_document(
         raise HTTPException(status_code=500, detail=f"Preview failed: {str(exc)}") from exc
 
 
-# ---------------------------------------------------------------------------
-# Streaming-aware plan endpoint (mirrors /api/agentic/plan but streams)
-# ---------------------------------------------------------------------------
-
-@app.post("/api/agentic/plan-stream")
-async def create_plan_stream(request: PlanRequest):
-    """Streaming version of /api/agentic/plan."""
-    if planner is None:
-        raise HTTPException(status_code=503, detail="Planner unavailable")
-
-    prefs = request.preferences or {}
-    if isinstance(prefs, list):
-        prefs = {p: True for p in prefs}
-    elif isinstance(prefs, dict):
-        pass  # already correct
-
-    async def event_generator():
-        async for chunk in planner.generate_itinerary_stream(
-            city=request.city,
-            country=request.country,
-            days=request.days,
-            budget=request.budget,
-            preferences=prefs,
-            user_id=request.user_id,
-        ):
-            yield chunk
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+# /api/agentic/plan-stream removed — use /api/v1/agentic/generate-itinerary-stream instead
 
 
 if __name__ == "__main__":

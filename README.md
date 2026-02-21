@@ -1,238 +1,275 @@
-# Agentic AI Travel Planner App
+# Agentic AI Travel Planner
 
-An intelligent travel planning application that generates personalized trip itineraries using AI and saves them for future reference.
+> Full-stack AI travel itinerary generator with real-time Google Maps, streaming LLM responses, and a multi-agent Python backend.
 
 ![Travel Planner](https://github.com/taroserigano/Next.js-ChatGPT_App-Master/blob/main/img/tours1.jpg)
 
-## Features
+---
 
-- **AI-Powered Trip Planning**: Generate detailed travel itineraries with attractions, hotels, and daily schedules
-- **Multi-Agent Architecture**: Specialized AI agents (Researcher, Logistics, Compliance, Experience) coordinate via LangGraph
-- **Serverless Microservice**: Python FastAPI backend deployed on AWS Lambda for scalable, on-demand processing
-- **Save & Manage Trips**: Store your trip plans in the cloud and access them anytime
-- **User Authentication**: Secure sign-in/sign-up with Clerk
-- **Responsive Design**: Modern, mobile-friendly interface built with Tailwind CSS and DaisyUI
+## Key Features
+
+| Feature                     | Details                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| **AI Itinerary Generation** | 8 activities/day with real street addresses, geocoded to Google Maps pins         |
+| **Streaming SSE**           | Watch the itinerary build in real-time via Server-Sent Events                     |
+| **Interactive Maps**        | Numbered pins, polyline routes, distance-verified geocoding (50 km city boundary) |
+| **Knowledge Vault**         | Upload PDFs/docs → RAG-powered Q&A over your own travel documents                 |
+| **Save & Manage Trips**     | Persist plans to Postgres (Neon), browse saved trips                              |
+| **Auth**                    | Clerk sign-in / sign-up with protected dashboard                                  |
+| **Live Travel Data**        | Amadeus API for real flights & hotels, Unsplash hero images                       |
+
+---
 
 ## Tech Stack
 
 ### Frontend
 
-- **Next.js** - React framework with App Router
-- **React 18** - UI library
-- **Tailwind CSS** - Utility-first CSS framework
-- **DaisyUI** - Tailwind CSS component library
-- **React Hot Toast** - Toast notifications
-- **React Icons** - Icon library
-- **Clerk** - User authentication and management
-- **TanStack React Query** - Data fetching and caching
+- **Next.js 14** (App Router) · **React 18** · **Tailwind CSS** · **DaisyUI**
+- **@react-google-maps/api** for interactive maps with geocoding
+- **TanStack React Query** for data fetching / caching
+- **Clerk** for authentication
+- **Prisma** ORM → PostgreSQL (Neon)
 
-### Backend
+### Backend (`agentic-service/`)
 
-- **Next.js API Routes** - Serverless API endpoints
-- **Prisma** - TypeScript ORM for database access
-- **PostgreSQL** - Primary database (Neon)
-- **Python FastAPI** - Agentic service for AI planning
-- **LangChain & LangGraph** - AI orchestration framework
-- **OpenAI API** - GPT models for trip generation
-- **Amadeus API** - Travel data and booking information
+- **Python 3.11+** · **FastAPI** · **Uvicorn** (ASGI)
+- **OpenAI gpt-4o-mini** with JSON mode & streaming
+- **LangChain / LangGraph** for multi-agent orchestration
+- **Amadeus SDK** for real flight & hotel search
+- **Unsplash API** for destination hero images
+- **cachetools** / **Redis** for in-memory + distributed caching
+- **orjson** for fast JSON serialization
 
-### AI & Machine Learning
+---
 
-- **LangChain** - LLM orchestration and agent framework
-- **LangGraph** - State machine for multi-agent coordination and workflow management
-- **OpenAI GPT** - Primary language model for natural language processing
-- **LangSmith** - LLM observability and debugging
-- **Multi-Agent System** - Specialized agents working in parallel:
-  - **Supervisor Agent** - Coordinates workflow and delegates tasks
-  - **Researcher Agent** - Discovers attractions, activities, and points of interest
-  - **Logistics Agent** - Plans transportation, hotels, and scheduling
-  - **Compliance Agent** - Validates travel requirements and regulations
-  - **Experience Agent** - Curates personalized recommendations
-
-### Python Service (agentic-service)
-
-- **FastAPI** - Modern async Python web framework for microservice API
-- **Uvicorn** - Lightning-fast ASGI server
-- **Pydantic** - Data validation and settings management
-- **SQLAlchemy** - Python SQL toolkit and ORM
-- **Psycopg2** - PostgreSQL database adapter
-- **Tenacity** - Retry logic for resilient API calls
-- **HTTPX** - Async HTTP client for external services
-
-**Microservice Architecture:**
-
-- Deployed as a serverless function on AWS Lambda
-- Stateless design for horizontal scaling
-- Event-driven with FastAPI endpoints
-- Integrated with Next.js via Lambda URL
-- Independent deployment and versioning from frontend
-
-### Development & Deployment
-
-- **TypeScript** - Type-safe JavaScript
-- **ESLint** - Code linting
-- **Autoprefixer** - CSS vendor prefixing
-- **PostCSS** - CSS processing
-- **Vercel** - Frontend deployment platform
-- **AWS Lambda** - Python service deployment
-
-## Environment Variables
-
-```bash
-# Database
-DATABASE_URL=your_postgresql_url
-
-# Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
-CLERK_SECRET_KEY=your_clerk_secret
-
-# AI Service
-AGENTIC_SERVICE_URL=your_lambda_url
-OPENAI_API_KEY=your_openai_key
-
-# Travel API
-AMADEUS_API_KEY=your_amadeus_key
-AMADEUS_API_SECRET=your_amadeus_secret
-```
-
-## Getting Started
+## Quick Start (Local Development)
 
 ### Prerequisites
 
-- Node.js 18+
-- Python 3.9+
-- PostgreSQL database
-- Clerk account
-- OpenAI API key
+| Tool       | Version | Notes                                      |
+| ---------- | ------- | ------------------------------------------ |
+| Node.js    | 18+     | `node -v` to check                         |
+| Python     | 3.11+   | 3.13 works too                             |
+| PostgreSQL | Any     | Or use [Neon](https://neon.tech) free tier |
+| Git        | Any     |                                            |
 
-### Installation
-
-1. Clone the repository
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/taroserigano/Agentic_AI_RAG_LLM_Traveler_Site_App.git
 cd Agentic_AI_RAG_LLM_Traveler_Site_App
-```
 
-2. Install frontend dependencies
-
-```bash
+# Frontend
 npm install
-```
 
-3. Install Python service dependencies
-
-```bash
+# Backend
 cd agentic-service
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+# source .venv/bin/activate
+
 pip install -r requirements.txt
+cd ..
 ```
 
-4. Set up environment variables
+### 2. Configure environment variables
+
+Create **`.env.local`** in the project root (Next.js reads this automatically):
 
 ```bash
-cp .env.example .env.local
-# Edit .env.local with your credentials
+# ── Authentication (Clerk) ──────────────────────────────────
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/chat
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/chat
+
+# ── Database (Prisma → PostgreSQL) ──────────────────────────
+DATABASE_URL=postgres://user:pass@host/db?sslmode=require
+
+# ── Backend URL ─────────────────────────────────────────────
+AGENTIC_SERVICE_URL=http://localhost:8000
+
+# ── Google Maps (browser-side, needs NEXT_PUBLIC_ prefix) ───
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIza...
 ```
 
-5. Run database migrations
+Create **`agentic-service/.env`** for the Python backend:
+
+```bash
+# ── Required ────────────────────────────────────────────────
+OPENAI_API_KEY=sk-proj-...
+
+# ── Optional (enhance results when provided) ────────────────
+AMADEUS_API_KEY=your_key
+AMADEUS_API_SECRET=your_secret
+GOOGLE_MAPS_API_KEY=AIza...
+UNSPLASH_ACCESS_KEY=your_key
+OPENWEATHER_API_KEY=your_key
+
+# ── Optional (caching) ─────────────────────────────────────
+# REDIS_URL=redis://localhost:6379/0
+# CACHE_TTL_SECONDS=86400
+```
+
+### 3. Database setup
 
 ```bash
 npx prisma migrate dev
+npx prisma generate
 ```
 
-6. Start the development servers
+### 4. Start both servers
 
-Terminal 1 - Frontend:
+**Terminal 1 — Backend (port 8000):**
+
+```bash
+cd agentic-service
+.venv\Scripts\activate          # Windows
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Terminal 2 — Frontend (port 3000):**
 
 ```bash
 npm run dev
 ```
 
-Terminal 2 - Python Service:
+Open **http://localhost:3000** → go to **Planner** → generate a trip.
 
-```bash
-cd agentic-service
-uvicorn main:app --reload --port 5001
-```
+---
 
-Visit `http://localhost:3000` to see the app.
+## API Keys — Where to Get Them
 
-## Architecture Overview
+| Key           | Free Tier?       | Sign Up                                                            |
+| ------------- | ---------------- | ------------------------------------------------------------------ |
+| OpenAI        | Pay-as-you-go    | https://platform.openai.com/api-keys                               |
+| Clerk         | Free (10k MAU)   | https://clerk.com                                                  |
+| Google Maps   | $200/mo credit   | https://console.cloud.google.com (enable Maps JS + Geocoding APIs) |
+| Amadeus       | Free (test env)  | https://developers.amadeus.com                                     |
+| Unsplash      | Free (50 req/hr) | https://unsplash.com/developers                                    |
+| Neon Postgres | Free tier        | https://neon.tech                                                  |
 
-### Multi-Agent System with LangGraph
-
-The trip planning process leverages **LangGraph** to orchestrate multiple specialized AI agents working collaboratively:
-
-1. **State Machine Design**: LangGraph manages a stateful workflow where each agent node processes the travel request and updates shared state
-2. **Agent Coordination**:
-   - **Supervisor Agent** analyzes the request and routes tasks to specialist agents
-   - Agents run in sequence, each building on previous results
-   - State transitions ensure data consistency across the workflow
-3. **Parallel Processing**: Multiple agents can process different aspects simultaneously (research attractions while checking logistics)
-4. **Fault Tolerance**: Each agent has retry logic and fallback strategies for API failures
-
-**Agent Workflow:**
-
-```
-User Request → Supervisor → [Researcher, Logistics, Compliance, Experience] → Decision → Final Itinerary
-```
-
-### Serverless Microservice Architecture
-
-**FastAPI Service on AWS Lambda:**
-
-- **Serverless Deployment**: No server management, automatic scaling based on demand
-- **Event-Driven**: Lambda function activates only when Next.js calls the endpoint
-- **Cost-Efficient**: Pay-per-invocation model (no idle server costs)
-- **Lambda URL Integration**: Direct HTTPS endpoint for seamless Next.js → Lambda communication
-- **Cold Start Optimization**: FastAPI's lightweight design minimizes cold start latency
-- **Stateless Design**: Each request is independent, enabling unlimited horizontal scaling
-
-**Benefits:**
-
-- Frontend (Vercel) and backend (Lambda) scale independently
-- Microservice can be updated/deployed without touching Next.js app
-- Lambda handles traffic spikes automatically during peak usage
-- Python environment isolated from Node.js frontend
-- Reduced operational complexity (no server maintenance)
-
-## Database Schema
-
-### TripPlan Model
-
-```prisma
-model TripPlan {
-  id          String   @id @default(uuid())
-  userId      String
-  destination String
-  country     String?
-  days        Int
-  preferences Json?
-  itinerary   Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-```
+---
 
 ## Project Structure
 
 ```
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   │   └── travel/        # Travel planner endpoints
-│   ├── (dashboard)/       # Protected dashboard routes
-│   │   ├── planner/       # Trip planner page
-│   │   └── tours/         # Saved trips page
-│   └── sign-in/           # Auth pages
-├── components/            # React components
-│   ├── TravelPlanner.jsx  # Main planner UI
-│   └── ToursList.jsx      # Saved trips list
-├── agentic-service/       # Python AI service
-│   ├── agents/            # LangGraph agents
-│   └── services/          # External APIs
-├── prisma/                # Database schema
-└── utils/                 # Utility functions
+├── app/                          # Next.js App Router
+│   ├── api/travel/               # API routes (planner, planner/stream, save, refine)
+│   ├── api/vault/                # Knowledge Vault API (upload, query, documents)
+│   ├── (dashboard)/              # Protected routes (planner, tours, chat, vault, profile)
+│   └── sign-in/ sign-up/        # Clerk auth pages
+│
+├── components/
+│   ├── TravelPlanner.jsx         # Main planner UI (form → streaming → itinerary display)
+│   ├── DayMapView.jsx            # Google Maps per-day view with geocoding + distance guard
+│   ├── KnowledgeVault.jsx        # RAG document upload & chat
+│   ├── Chat.jsx                  # General AI chat
+│   ├── ToursList.jsx             # Browse saved trips
+│   └── Sidebar.jsx / NavLinks.jsx
+│
+├── agentic-service/              # Python FastAPI backend
+│   ├── main.py                   # FastAPI app, SSE streaming, CORS, health endpoints
+│   ├── config.py                 # Pydantic settings (env vars)
+│   ├── agents/
+│   │   ├── simple_planner.py     # Local dev planner (OpenAI streaming + caching)
+│   │   ├── simple_planner_lambda.py  # Lambda-optimized planner
+│   │   ├── planner.py            # Full LangGraph multi-agent planner
+│   │   └── state.py / tools.py   # Agent state & tool definitions
+│   └── services/
+│       ├── amadeus_service.py    # Flight & hotel search (Amadeus SDK)
+│       ├── unsplash_service.py   # Destination hero images
+│       ├── cache_service.py      # TTLCache + optional Redis
+│       └── vault.py              # FAISS vector store for RAG
+│
+├── prisma/
+│   └── schema.prisma             # Tour, TripPlan, KnowledgeDocument, ChatSession models
+│
+├── utils/
+│   ├── actions.js                # Server actions (Prisma queries)
+│   └── db.ts                     # Prisma client singleton
+│
+├── serverless.yml                # AWS Lambda deployment (Serverless Framework)
+├── render.yaml                   # Render.com deployment
+├── docker-compose.yml            # Docker Compose for ECS / local Docker
+├── Dockerfile                    # Frontend container
+└── agentic-service/Dockerfile    # Backend container
 ```
+
+---
+
+## Deployment Options
+
+### Option A: Serverless (current `serverless.yml`)
+
+The existing setup deploys the Python backend to **AWS Lambda** via Serverless Framework, and the frontend to **Vercel** or **Render**.
+
+```bash
+# Deploy backend to Lambda
+cd agentic-service
+sls deploy
+
+# Deploy frontend to Vercel
+vercel --prod
+```
+
+**Pros:** Zero ops, pay-per-invocation, auto-scaling.
+**Cons:** Cold starts (5–15s for Python + ML libs), 15-min timeout limit, 250 MB package limit (tight with torch/transformers), no persistent connections (WebSockets need API Gateway).
+
+### Option B: ECS Fargate with Docker (recommended for production)
+
+Better fit for this app because:
+
+- **No cold starts** — containers stay warm
+- **Streaming SSE works natively** — no API Gateway buffering issues
+- **No package size limits** — include torch, transformers, FAISS freely
+- **Predictable latency** — consistent ~2s first-byte vs 5–15s Lambda cold start
+- **Long-running requests** — no 15-min timeout (itinerary generation can take 30–60s)
+- **Cost-effective at moderate traffic** — Fargate Spot can be 70% cheaper than on-demand
+
+Deploy **both containers** (frontend + backend) to ECS Fargate with an ALB in front.
+
+```bash
+# Build and push images
+docker build -t travel-frontend .
+docker build -t travel-backend ./agentic-service
+
+# Tag and push to ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
+docker tag travel-frontend:latest <account>.dkr.ecr.us-east-1.amazonaws.com/travel-frontend:latest
+docker tag travel-backend:latest <account>.dkr.ecr.us-east-1.amazonaws.com/travel-backend:latest
+docker push <account>.dkr.ecr.us-east-1.amazonaws.com/travel-frontend:latest
+docker push <account>.dkr.ecr.us-east-1.amazonaws.com/travel-backend:latest
+```
+
+### Option C: Local Docker (for testing containers)
+
+```bash
+docker-compose up --build
+```
+
+Frontend: http://localhost:3000 · Backend: http://localhost:8000
+
+---
+
+## Troubleshooting
+
+| Problem                                        | Fix                                                                                                                                                |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"This page can't load Google Maps correctly"` | Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local` and **restart** the frontend (`npm run dev`). `NEXT_PUBLIC_` vars are inlined at build time. |
+| Backend returns **503**                        | Check `agentic-service/.env` has `OPENAI_API_KEY`. Run `pip install amadeus` if you see `ModuleNotFoundError: No module named 'amadeus'`.          |
+| Only 4 pins on the map                         | You're hitting the fallback planner. The backend must be running and reachable at `AGENTIC_SERVICE_URL`.                                           |
+| Pins in wrong city                             | The distance guard rejects geocoded locations >50 km from the city center. Check browser console for `[DayMapView] ⚠` warnings.                    |
+| `bash: python: command not found` (Windows)    | Use the venv directly: `agentic-service\.venv\Scripts\python.exe -m uvicorn main:app --port 8000 --reload`                                         |
+| `prisma migrate` fails                         | Ensure `DATABASE_URL` in `.env.local` is correct. For Neon, use the pooler URL with `?sslmode=require`.                                            |
+
+---
 
 ## License
 

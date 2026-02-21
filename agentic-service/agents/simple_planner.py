@@ -6,7 +6,7 @@ Optimizations applied:
   2. Parallel LLM + Amadeus + Unsplash (all fire concurrently)
   3. Ultra-compact system prompt (~250 tokens, 3x reduction from original)
   4. Lean user prompt (~60 tokens, 2x reduction)
-  5. max_tokens 2000, temperature 0.4, top_p 0.8 for faster sampling
+  5. max_tokens 8000, temperature 0.4, top_p 0.8 for faster sampling
   6. OpenAI response_format=json_object for guaranteed valid JSON
   7. In-memory LRU + Redis caching via cache_service
   8. Streaming support via async generator (SSE) with stream_options
@@ -15,7 +15,9 @@ Optimizations applied:
   11. Batched pre-warm (semaphore=5 concurrent, 0.2s delay)
 """
 import asyncio
+import json as _json
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, AsyncGenerator, Dict, Optional
@@ -50,21 +52,56 @@ except Exception:
 
 SYSTEM_PROMPT = """Expert travel planner. Return ONLY valid JSON.
 
-Location objects: {"name":"Place","address":"street addr or Name, City"}
-- Restaurants/cafes/bars/shops → exact street address
-- Parks/landmarks/trails → "Name, City"
-No repeated locations.
+RULE 1 – ACTIVITY COUNT (MANDATORY):
+Every day's "plan" array MUST contain EXACTLY 8 entries covering 7 AM – 9 PM:
+  1. 7:00 AM  – breakfast
+  2. 8:30 AM  – morning activity 1
+  3. 10:00 AM – morning activity 2
+  4. 12:00 PM – lunch
+  5. 2:00 PM  – afternoon activity 1
+  6. 4:00 PM  – afternoon activity 2
+  7. 6:30 PM  – dinner
+  8. 8:00 PM  – evening activity
+Never return fewer than 8 plan entries per day.
+
+RULE 2 – ADDRESSES (MANDATORY):
+- Every location.address MUST be a REAL, FULL street address: number + street + district + city + postal code.
+  Good:  "85 Pike St, Seattle, WA 98101"
+  Good:  "1-4-2 Kokubuncho, Aoba-ku, Sendai 980-0803"
+  Bad:   "Downtown" / "Main Square" / "City Center"
+- ALL restaurant / café / bar / shop names MUST be real existing places.
+
+RULE 4 – CITY BOUNDARY (MANDATORY):
+- EVERY activity MUST be located WITHIN the requested city or its immediate metro area.
+- NEVER include locations from other cities or prefectures. For example, if the user asks for Tokyo, do NOT include Kyoto, Osaka, Kamakura, Nikko, or any location outside the Tokyo metropolitan area.
+- If the user wants a multi-city trip, they will specify that explicitly.
+
+RULE 3 – MEALS:
+Each day MUST also have a "meals" object {breakfast, lunch, dinner}, each with name, address, cuisine, price_range.
+The meal names SHOULD match the corresponding breakfast/lunch/dinner entries in "plan".
+
+Example plan entry:
+{"time":"12:00 PM","activity":"Lunch at Pike Place Chowder","location":{"name":"Pike Place Chowder","address":"1530 Post Alley, Seattle, WA 98101"},"duration":"1.5h","notes":"Famous clam chowder in a bread bowl"}
 
 JSON schema:
-{"title":"str","description":"str","top_10_places":["str"],"daily_plans":[{"day":1,"date":"Day 1","theme":"str","plan":[{"time":"7:00 AM","activity":"str","location":{"name":"str","address":"str"},"duration":"1h","notes":"str"}],"estimated_walking":"5km","tips":"str"}],"highlights":["str"],"local_tips":["str"],"recommended_hotels":[{"name":"str","rating":4.5,"price_range":"$100-200/night","address":"str","description":"str"}],"compliance":{"visa_required":false,"safety_level":"safe","vaccinations":[]},"estimated_costs":{"accommodation":0,"food":0,"activities":0,"transport":0,"total":0}}"""
+{"title":"str","description":"str","top_10_places":["str"],"daily_plans":[{"day":1,"date":"Day 1","theme":"str","plan":[{"time":"7:00 AM","activity":"str","location":{"name":"str","address":"str"},"duration":"1h","notes":"str"}],"meals":{"breakfast":{"name":"str","address":"str","cuisine":"str","price_range":"str"},"lunch":{"name":"str","address":"str","cuisine":"str","price_range":"str"},"dinner":{"name":"str","address":"str","cuisine":"str","price_range":"str"}},"estimated_walking":"5km","tips":"str"}],"highlights":["str"],"local_tips":["str"],"recommended_hotels":[{"name":"str","rating":4.5,"price_range":"$100-200/night","address":"str","description":"str"}],"compliance":{"visa_required":false,"safety_level":"safe","vaccinations":[]},"estimated_costs":{"accommodation":0,"food":0,"activities":0,"transport":0,"total":0}}"""
 
 
 def _build_user_prompt(city: str, country: str, days: int, budget_str: str, pref_str: str) -> str:
     return (
-        f"{days}-day trip to {city}, {country}. Prefs: {pref_str}. Budget: {budget_str}.\n"
-        f"Include: 10 top_10_places, hour-by-hour daily_plans (7AM-8PM, meals included), "
-        f"3 recommended_hotels with ratings/prices, estimated_costs in USD. "
-        f"Venues (cafes/restaurants/shops): exact street address. Landmarks: Name, City."
+        f"Plan a {days}-day trip to {city}, {country}.\n"
+        f"Preferences: {pref_str}. Budget: {budget_str}.\n\n"
+        f"MANDATORY: Each day MUST have EXACTLY 8 entries in the 'plan' array:\n"
+        f"  1) 7:00 AM breakfast  2) 8:30 AM morning-1  3) 10:00 AM morning-2\n"
+        f"  4) 12:00 PM lunch  5) 2:00 PM afternoon-1  6) 4:00 PM afternoon-2\n"
+        f"  7) 6:30 PM dinner  8) 8:00 PM evening\n\n"
+        f"MANDATORY: Every location.address must be a COMPLETE real street address "
+        f"(number, street, city, postal code). Example: '85 Pike St, Seattle, WA 98101'.\n"
+        f"ALL restaurant/café names must be REAL places that exist.\n\n"
+        f"Also include: 10 top_10_places, "
+        f"meals object per day (breakfast/lunch/dinner with name+address+cuisine+price_range), "
+        f"3 recommended_hotels with ratings/prices/addresses, estimated_costs in USD, "
+        f"compliance info, highlights, local_tips."
     )
 
 
@@ -78,7 +115,36 @@ def _extract_json(content: str) -> Dict[str, Any]:
         text = text.split("```json", 1)[1].split("```", 1)[0].strip()
     elif "```" in text:
         text = text.split("```", 1)[1].split("```", 1)[0].strip()
-    return _json_loads(text)
+    try:
+        return _json_loads(text)
+    except Exception:
+        # Attempt to repair truncated JSON by closing open braces/brackets
+        repaired = _repair_truncated_json(text)
+        return _json_loads(repaired)
+
+
+def _repair_truncated_json(text: str) -> str:
+    """Best-effort repair of truncated JSON by closing open brackets/braces."""
+    # Remove any trailing comma or incomplete value
+    text = re.sub(r',\s*$', '', text.rstrip())
+    # Remove incomplete string at the end  (e.g. '"some text'  without closing quote)
+    if text.count('"') % 2 != 0:
+        # Remove chars from end up to and including the last opening quote
+        last_q = text.rfind('"')
+        text = text[:last_q].rstrip().rstrip(',')
+    # Count open vs close braces and brackets
+    opens = []
+    for ch in text:
+        if ch in ('{', '['):
+            opens.append(ch)
+        elif ch == '}' and opens and opens[-1] == '{':
+            opens.pop()
+        elif ch == ']' and opens and opens[-1] == '[':
+            opens.pop()
+    # Close everything that's still open (in reverse order)
+    for ch in reversed(opens):
+        text += ']' if ch == '[' else '}'
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -190,8 +256,29 @@ class SimplePlanner:
             adults=1, max_results=3,
         )
 
+    # IATA city codes for hotel search (extends the airport mapping)
+    _CITY_CODES = {
+        "tokyo": "TYO", "paris": "PAR", "london": "LON",
+        "new york": "NYC", "los angeles": "LAX", "san francisco": "SFO",
+        "chicago": "CHI", "miami": "MIA", "seattle": "SEA", "boston": "BOS",
+        "rome": "ROM", "barcelona": "BCN", "amsterdam": "AMS",
+        "dubai": "DXB", "singapore": "SIN", "hong kong": "HKG",
+        "sydney": "SYD", "bangkok": "BKK", "seoul": "SEL", "beijing": "BJS",
+        "istanbul": "IST", "berlin": "BER", "madrid": "MAD",
+        "mumbai": "BOM", "delhi": "DEL", "taipei": "TPE",
+        "kuala lumpur": "KUL", "osaka": "OSA", "kyoto": "UKY",
+        "prague": "PRG", "vienna": "VIE", "lisbon": "LIS",
+        "athens": "ATH", "cairo": "CAI", "cape town": "CPT",
+        "buenos aires": "BUE", "mexico city": "MEX", "rio de janeiro": "RIO",
+        "hanoi": "HAN", "dublin": "DUB", "edinburgh": "EDI",
+        "copenhagen": "CPH", "stockholm": "STO", "oslo": "OSL",
+        "helsinki": "HEL", "zurich": "ZRH", "florence": "FLR",
+        "marrakech": "RAK", "havana": "HAV", "bali": "DPS",
+        "phuket": "HKT", "cancun": "CUN", "reykjavik": "REK",
+    }
+
     async def _fetch_hotels(self, city: str):
-        city_code = city[:3].upper()
+        city_code = self._CITY_CODES.get(city.strip().lower(), city[:3].upper())
         return await amadeus_service.async_search_hotels(
             city_code=city_code, max_results=5,
         )
@@ -223,7 +310,7 @@ class SimplePlanner:
             ],
             temperature=0.4,
             top_p=0.8,
-            max_tokens=3500,
+            max_tokens=16000,
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content.strip()
@@ -242,7 +329,7 @@ class SimplePlanner:
             ],
             temperature=0.4,
             top_p=0.8,
-            max_tokens=3500,
+            max_tokens=16000,
             response_format={"type": "json_object"},
             stream=True,
             stream_options={"include_usage": True},
@@ -336,7 +423,7 @@ class SimplePlanner:
           event: result   data: {full itinerary JSON}
           event: done     data: {}
         """
-        import json as _json  # for SSE serialization
+        # _json imported at module top
 
         run_id = str(uuid.uuid4())
 
@@ -375,10 +462,11 @@ class SimplePlanner:
         # Parse accumulated JSON
         try:
             itinerary_data = _extract_json(accumulated)
-        except Exception:
+        except Exception as parse_exc:
+            logger.error(f"[{run_id}] JSON parse failed: {parse_exc}  — accumulated length={len(accumulated)}  — last 200 chars: {accumulated[-200:]}")
             itinerary_data = {
                 "title": f"{days}-Day {city} Adventure",
-                "description": accumulated[:500],
+                "description": f"Explore the best of {city}, {country} over {days} days.",
                 "daily_plans": [],
                 "top_10_places": [],
                 "highlights": [],

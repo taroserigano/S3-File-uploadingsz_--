@@ -163,12 +163,15 @@ Return your response as a structured JSON object with this format:
       "theme": "Day theme",
       "plan": [
         {"time": "7:00 AM", "activity": "Wake up and breakfast", "location": "Cafe Name, Street Address with Chome, District, City Postal-Code", "duration": "1 hour", "notes": "Start your day with freshly baked croissants and locally roasted coffee at this charming neighborhood cafe. The outdoor seating offers great people-watching and the baristas can recommend the best dishes."},
-        {"time": "8:00 AM", "activity": "Morning activity", "location": "Museum Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "This world-class museum houses over 10,000 artifacts spanning three centuries of cultural history. Arrive early to beat the crowds and don't miss the special exhibition on the third floor."},
+        {"time": "8:30 AM", "activity": "Morning activity 1", "location": "Museum Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "This world-class museum houses over 10,000 artifacts spanning three centuries of cultural history. Arrive early to beat the crowds and don't miss the special exhibition on the third floor."},
+        {"time": "10:30 AM", "activity": "Morning activity 2", "location": "Place Name, Street Address with Chome, District, City Postal-Code", "duration": "1.5 hours", "notes": "Explore this stunning area known for its unique architecture and vibrant atmosphere. A perfect spot for photography and soaking in the local culture."},
         {"time": "12:00 PM", "activity": "Lunch", "location": "Restaurant Name, Street Address with Chome, District, City Postal-Code", "duration": "1.5 hours", "notes": "Try their signature dish that has been perfected over three generations of family recipes. The lunch set menu offers excellent value and includes seasonal appetizers."},
-        {"time": "2:00 PM", "activity": "Afternoon activity", "location": "Place Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "Experience breathtaking panoramic views from the observation deck, best visited on clear afternoons. The audio guide provides fascinating historical context and points out landmarks visible from the top."},
-        {"time": "6:00 PM", "activity": "Dinner", "location": "Restaurant Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "This award-winning restaurant specializes in modern fusion cuisine using local ingredients. Reservations are recommended, and ask for a window seat to enjoy the evening city lights."}
+        {"time": "2:00 PM", "activity": "Afternoon activity 1", "location": "Place Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "Experience breathtaking panoramic views from the observation deck, best visited on clear afternoons. The audio guide provides fascinating historical context and points out landmarks visible from the top."},
+        {"time": "4:00 PM", "activity": "Afternoon activity 2", "location": "Place Name, Street Address with Chome, District, City Postal-Code", "duration": "1.5 hours", "notes": "Wander through this vibrant market district where locals shop for fresh produce, crafts, and street food. Don't miss the artisan stalls tucked in the back alleys."},
+        {"time": "6:00 PM", "activity": "Dinner", "location": "Restaurant Name, Street Address with Chome, District, City Postal-Code", "duration": "2 hours", "notes": "This award-winning restaurant specializes in modern fusion cuisine using local ingredients. Reservations are recommended, and ask for a window seat to enjoy the evening city lights."},
+        {"time": "8:00 PM", "activity": "Evening activity", "location": "Place Name, Street Address with Chome, District, City Postal-Code", "duration": "1.5 hours", "notes": "End the day with a leisurely stroll through this beautifully illuminated area. The nighttime atmosphere is magical and offers a completely different perspective from daytime."}
       ],
-      "total_activities": 5,
+      "total_activities": 8,
       "estimated_walking": "5 km",
       "tips": "Wear comfortable shoes"
     }
@@ -212,8 +215,7 @@ Please create a comprehensive itinerary that:
 5. Provides local insights and safety information
 6. Uses ONLY complete addresses with Chome format and postal codes: "Place Name, # Chome-#-# Street, District, City ###-####" (e.g., "Senso-ji Temple, 2-3-1 Asakusa, Taito, Tokyo 111-0032")
 7. NEVER repeats the same location twice in the itinerary
-8. Keep locations concise - NO full street addresses, postal codes, or detailed address info
-9. Each location must be a specific, named place (museum, restaurant, store, landmark)
+8. Each location must be a specific, named place (museum, restaurant, store, landmark) with a REAL street address
 
 IMPORTANT: 
 1. Create a "top_10_places" array with EXACTLY 10 must-visit places/attractions in {city}
@@ -248,7 +250,7 @@ Return the itinerary as JSON following the specified format."""
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=4000
+                max_tokens=16000
             )
             
             # Parse the response

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import toast from "react-hot-toast";
+import DayMapView from "./DayMapView";
 
 const TravelPlanner = ({ userId }) => {
   // Form state
@@ -64,7 +65,13 @@ const TravelPlanner = ({ userId }) => {
       const response = await fetch("/api/travel/planner/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, country, days, budget, preferences }),
+        body: JSON.stringify({
+          destination,
+          country,
+          days,
+          budget,
+          preferences,
+        }),
         signal: controller.signal,
       });
 
@@ -73,7 +80,13 @@ const TravelPlanner = ({ userId }) => {
         const fallbackRes = await fetch("/api/travel/planner", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination, country, days, budget, preferences }),
+          body: JSON.stringify({
+            destination,
+            country,
+            days,
+            budget,
+            preferences,
+          }),
         });
         if (!fallbackRes.ok) {
           const errData = await fallbackRes.json();
@@ -125,17 +138,19 @@ const TravelPlanner = ({ userId }) => {
                   tour.daily_plans = tour.daily_plans.map((day) => ({
                     ...day,
                     title: day.theme || day.title,
-                    activities: (day.plan || day.activities || []).map((activity) => ({
-                      time: activity.time,
-                      name: activity.activity || activity.name,
-                      description: activity.notes || activity.description,
-                      location:
-                        typeof activity.location === "string"
-                          ? { address: activity.location, type: "location" }
-                          : activity.location,
-                      duration: activity.duration,
-                      estimated_duration: activity.duration,
-                    })),
+                    activities: (day.plan || day.activities || []).map(
+                      (activity) => ({
+                        time: activity.time,
+                        name: activity.activity || activity.name,
+                        description: activity.notes || activity.description,
+                        location:
+                          typeof activity.location === "string"
+                            ? { address: activity.location, type: "location" }
+                            : activity.location,
+                        duration: activity.duration,
+                        estimated_duration: activity.duration,
+                      }),
+                    ),
                   }));
                 }
                 setTripData({
@@ -250,17 +265,19 @@ const TravelPlanner = ({ userId }) => {
                                 )}
                                 {/* Exact street address — shown as muted secondary text when it differs from the name */}
                                 {activity.location.address &&
-                                  activity.location.address !== activity.location.name && (
+                                  activity.location.address !==
+                                    activity.location.name && (
                                     <p className="text-xs text-base-content/50 mt-0.5">
                                       {activity.location.address}
                                     </p>
                                   )}
                                 {/* Fallback: old format where only address string exists */}
-                                {!activity.location.name && activity.location.address && (
-                                  <p className="font-semibold text-sm">
-                                    {activity.location.address}
-                                  </p>
-                                )}
+                                {!activity.location.name &&
+                                  activity.location.address && (
+                                    <p className="font-semibold text-sm">
+                                      {activity.location.address}
+                                    </p>
+                                  )}
                                 {activity.location.cuisine && (
                                   <p className="text-xs text-base-content/60 mt-1">
                                     Cuisine: {activity.location.cuisine} •{" "}
@@ -289,6 +306,84 @@ const TravelPlanner = ({ userId }) => {
                   </div>
                 ))}
               </div>
+
+              {/* Interactive route map for this day */}
+              {(day.activities?.length > 0 || day.meals) && (
+                <DayMapView
+                  activities={(() => {
+                    const acts = [...(day.activities || [])];
+                    // Add meals from day.meals ONLY if they aren't already
+                    // represented in the activities list (avoid duplicate pins)
+                    if (day.meals) {
+                      const existingNames = new Set(
+                        acts.map((a) =>
+                          (a.name || "")
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]/g, ""),
+                        ),
+                      );
+                      const existingLocNames = new Set(
+                        acts.map((a) =>
+                          (a.location?.name || "")
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]/g, ""),
+                        ),
+                      );
+                      ["breakfast", "lunch", "dinner"].forEach((m) => {
+                        const meal = day.meals[m];
+                        if (!meal) return;
+                        const mealName =
+                          typeof meal === "string" ? meal : meal.name;
+                        const address =
+                          typeof meal === "string" ? null : meal.address;
+                        if (!mealName) return;
+                        const key = mealName
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]/g, "");
+                        // Skip if this restaurant is already an activity
+                        if (existingNames.has(key) || existingLocNames.has(key))
+                          return;
+                        // Also check if any activity name contains this meal name or vice-versa
+                        const isDuplicate = acts.some((a) => {
+                          const an = (a.name || "").toLowerCase();
+                          const ln = (a.location?.name || "").toLowerCase();
+                          const mn = mealName.toLowerCase();
+                          return (
+                            an.includes(mn) ||
+                            mn.includes(an) ||
+                            ln.includes(mn) ||
+                            mn.includes(ln)
+                          );
+                        });
+                        if (isDuplicate) return;
+                        acts.push({
+                          name: mealName,
+                          time:
+                            m === "breakfast"
+                              ? "8:00 AM"
+                              : m === "lunch"
+                                ? "12:30 PM"
+                                : "7:00 PM",
+                          location: address
+                            ? { name: mealName, address }
+                            : { name: mealName, address: mealName },
+                        });
+                      });
+                    }
+                    console.log(
+                      `[TravelPlanner] Day ${day.day || idx + 1}: ${acts.length} activities → DayMapView`,
+                      acts.map((a) => a.name),
+                    );
+                    return acts;
+                  })()}
+                  city={
+                    tripData.metadata?.destination ||
+                    tripData.itinerary?.city ||
+                    destination
+                  }
+                  dayNumber={day.day || idx + 1}
+                />
+              )}
 
               {day.meals && (
                 <div className="mt-4 pt-4 border-t">

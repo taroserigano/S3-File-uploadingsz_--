@@ -27,7 +27,7 @@ export async function POST(request) {
     if (!destination || !days) {
       return NextResponse.json(
         { error: "Destination and days are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,7 +50,7 @@ export async function POST(request) {
             preferences: preferences || {},
             user_id: userId,
           }),
-        }
+        },
       );
 
       if (planResponse.ok) {
@@ -114,7 +114,7 @@ export async function POST(request) {
           destination,
           country,
           days,
-          preferences
+          preferences,
         );
       }
     } catch (err) {
@@ -124,7 +124,7 @@ export async function POST(request) {
         destination,
         country,
         days,
-        preferences
+        preferences,
       );
     }
 
@@ -154,7 +154,7 @@ export async function POST(request) {
     console.error("Error generating travel plan:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate travel plan" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -424,7 +424,7 @@ function generateFallbackItinerary(destination, country, days, preferences) {
 
   // Shuffle restaurant database for randomization
   const shuffledRestaurants = [...restaurantDatabase].sort(
-    () => Math.random() - 0.5
+    () => Math.random() - 0.5,
   );
 
   // Track used activities and restaurants to avoid duplicates
@@ -446,7 +446,7 @@ function generateFallbackItinerary(destination, country, days, preferences) {
     // Get unique afternoon activity
     let afternoonActivity =
       activityList.find(
-        (a) => !usedActivities.has(a.name) && a.name !== morningActivity.name
+        (a) => !usedActivities.has(a.name) && a.name !== morningActivity.name,
       ) || activityList[(i + 1) % activityList.length];
     usedActivities.add(afternoonActivity.name);
 
@@ -554,7 +554,7 @@ function generateFallbackItinerary(destination, country, days, preferences) {
     description: `Experience the best of ${destination}, ${
       country || destination
     } with this carefully planned ${days}-day itinerary featuring ${selectedPreferences.join(
-      ", "
+      ", ",
     )} activities.`,
     daily_plans,
   };
