@@ -1,0 +1,6 @@
+name: travel-app
+runtime: nodejs
+description: Agentic AI Travel Planner – AWS EC2 free-tier deployment
+config:
+  aws:region:
+    value: us-east-1

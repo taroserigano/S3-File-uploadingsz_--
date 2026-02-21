@@ -3,9 +3,6 @@ import Link from "next/link";
 const links = [
   { href: "/planner", label: "trip planner" },
   { href: "/planner/saved", label: "saved trips" },
-  { href: "/tours", label: "tours" },
-  { href: "/chat", label: "chat" },
-  { href: "/vault", label: "knowledge vault" },
 ];
 
 const NavLinks = () => {

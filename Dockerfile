@@ -13,6 +13,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Build args – Next.js inlines NEXT_PUBLIC_* at build time
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
 # Prisma generate before build
 RUN npx prisma generate
 RUN npm run build

@@ -19,13 +19,20 @@ export async function POST(request) {
     if (!destination || !days) {
       return new Response(
         JSON.stringify({ error: "Destination and days are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
     // Call the streaming plan endpoint on the agentic service
+    // Backend expects preferences as list[str] of active keys
+    const prefsList = preferences
+      ? Object.entries(preferences)
+          .filter(([, v]) => v)
+          .map(([k]) => k)
+      : [];
+
     const response = await fetch(
-      `${AGENTIC_SERVICE_URL}/api/agentic/plan-stream`,
+      `${AGENTIC_SERVICE_URL}/api/v1/agentic/generate-itinerary-stream`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -34,10 +41,10 @@ export async function POST(request) {
           country: country || destination,
           days: parseInt(days),
           budget: budget ? parseFloat(budget) : null,
-          preferences: preferences || {},
+          preferences: prefsList,
           user_id: userId,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -45,8 +52,13 @@ export async function POST(request) {
         detail: "Failed to generate trip plan",
       }));
       return new Response(
-        JSON.stringify({ error: errorData.detail || "Failed to generate trip plan" }),
-        { status: response.status, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: errorData.detail || "Failed to generate trip plan",
+        }),
+        {
+          status: response.status,
+          headers: { "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -63,7 +75,7 @@ export async function POST(request) {
     console.error("Error in streaming trip plan generation:", error);
     return new Response(
       JSON.stringify({ error: "Failed to generate trip plan" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }
