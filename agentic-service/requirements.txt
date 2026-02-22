@@ -5,14 +5,14 @@ pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
 # LangChain & LangGraph for agentic workflows
-langchain==0.1.4
-langchain-openai==0.0.5
-langchain-community==0.0.16
-langgraph==0.2.45
-langsmith==0.0.83
+langchain>=0.3.0,<0.4
+langchain-openai>=0.2.0,<0.3
+langchain-community>=0.3.0,<0.4
+langgraph>=0.2.45,<0.3
+langsmith>=0.1.0
 
 # OpenAI API
-openai==1.10.0
+openai>=1.30.0
 
 # Hugging Face transformers & embeddings
 transformers==4.37.0
