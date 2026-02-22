@@ -2,13 +2,19 @@
 import OpenAI from "openai";
 import prisma from "./db";
 import { revalidatePath } from "next/cache";
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+
+// Lazy-init: avoid throwing at import time during Next.js build
+let _openai;
+function getOpenAI() {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 export const generateChatResponse = async (chatMessages) => {
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       messages: [
         { role: "system", content: "you are a helpful assistant" },
         ...chatMessages,
@@ -43,7 +49,7 @@ Once you have a list, create a one-day tour. Response should be  in the followin
 "stops" property should include only three stops.
 If you can't find info on exact ${city}, or ${city} does not exist, or it's population is less than 1, or it is not located in the following ${country},   return { "tour": null }, with no additional characters.`;
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       messages: [
         { role: "system", content: "you are a tour guide" },
         {
@@ -124,7 +130,7 @@ export const getSingleTour = async (id) => {
 
 export const generateTourImage = async ({ city, country }) => {
   try {
-    const tourImage = await openai.images.generate({
+    const tourImage = await getOpenAI().images.generate({
       prompt: `a panoramic view of teh ${city} ${country}`,
       n: 1,
       size: "512x512",
