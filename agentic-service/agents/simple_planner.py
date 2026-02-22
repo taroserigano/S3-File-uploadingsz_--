@@ -175,6 +175,81 @@ def _collect_stops(itinerary_data: Dict) -> list:
 # Helper: Build tour dict
 # ---------------------------------------------------------------------------
 
+def _merge_hotel_recommendations(
+    llm_hotels: list,
+    amadeus_hotels: list,
+    city: str,
+) -> list:
+    """
+    Merge LLM-generated hotel recommendations with Amadeus API hotel data.
+
+    Priority:
+      1. LLM hotels (have name, rating, price_range, description)
+      2. Amadeus hotels enriched with sensible defaults (fill gaps)
+      3. If both empty, return generic fallback so UI never shows "no hotels"
+    """
+    merged = []
+
+    # Start with LLM hotels (they have the richest data)
+    for h in llm_hotels:
+        merged.append({
+            "name": h.get("name", "Hotel"),
+            "rating": h.get("rating", 4.0),
+            "price_range": h.get("price_range", "$100-200/night"),
+            "address": h.get("address", city),
+            "description": h.get("description", ""),
+            "source": "ai",
+        })
+
+    # Supplement with Amadeus hotels that aren't duplicates
+    llm_names = {h.get("name", "").lower().strip() for h in llm_hotels}
+    for h in amadeus_hotels:
+        name = h.get("name", "")
+        if name.lower().strip() in llm_names:
+            continue
+        addr = h.get("address", {})
+        merged.append({
+            "name": name,
+            "rating": 4.0,  # Amadeus by_city doesn't return ratings
+            "price_range": "Contact for pricing",
+            "address": addr.get("cityName", city) if isinstance(addr, dict) else str(addr),
+            "description": f"Listed on Amadeus (ID: {h.get('hotelId', 'N/A')})",
+            "source": "amadeus",
+        })
+
+    # If we still have nothing, produce a minimal fallback
+    if not merged:
+        logger.warning(f"No hotels from LLM or Amadeus for {city} — generating fallback")
+        merged = [
+            {
+                "name": f"{city} Central Hotel",
+                "rating": 4.0,
+                "price_range": "$100-200/night",
+                "address": f"City Center, {city}",
+                "description": f"Centrally located hotel in {city}. Check travel sites for availability.",
+                "source": "fallback",
+            },
+            {
+                "name": f"{city} Budget Inn",
+                "rating": 3.5,
+                "price_range": "$50-90/night",
+                "address": f"{city} downtown area",
+                "description": f"Affordable option near main attractions in {city}.",
+                "source": "fallback",
+            },
+            {
+                "name": f"{city} Grand Resort",
+                "rating": 4.5,
+                "price_range": "$200-400/night",
+                "address": f"Premium district, {city}",
+                "description": f"Premium accommodation with top amenities in {city}.",
+                "source": "fallback",
+            },
+        ]
+
+    return merged[:5]  # Cap at 5
+
+
 def _build_tour(
     city: str,
     country: str,
@@ -185,6 +260,12 @@ def _build_tour(
     hero_image: Optional[Dict],
 ) -> Dict[str, Any]:
     stops = _collect_stops(itinerary_data)
+
+    # ── Merge hotel sources (LLM + Amadeus + fallback) ──
+    llm_hotels = itinerary_data.get("recommended_hotels") or []
+    amadeus_hotels = (hotel_data.get("hotels") if hotel_data else None) or []
+    recommended = _merge_hotel_recommendations(llm_hotels, amadeus_hotels, city)
+
     tour = {
         "city": city,
         "country": country,
@@ -194,7 +275,7 @@ def _build_tour(
         "stops": stops,
         "daily_schedule": itinerary_data.get("daily_schedule", []),
         "daily_plans": itinerary_data.get("daily_plans", []),
-        "recommended_hotels": itinerary_data.get("recommended_hotels", []),
+        "recommended_hotels": recommended,
         "compliance": itinerary_data.get("compliance", {}),
         "research": {
             "highlights": itinerary_data.get("highlights", []),
@@ -203,8 +284,8 @@ def _build_tour(
         },
         "real_data": {
             "flights": (flight_data or {}).get("flights", []),
-            "hotels": (hotel_data or {}).get("hotels", []),
-            "has_real_data": bool(flight_data or hotel_data),
+            "hotels": amadeus_hotels,
+            "has_real_data": bool(flight_data or amadeus_hotels),
         },
     }
     if hero_image:
@@ -256,29 +337,13 @@ class SimplePlanner:
             adults=1, max_results=3,
         )
 
-    # IATA city codes for hotel search (extends the airport mapping)
-    _CITY_CODES = {
-        "tokyo": "TYO", "paris": "PAR", "london": "LON",
-        "new york": "NYC", "los angeles": "LAX", "san francisco": "SFO",
-        "chicago": "CHI", "miami": "MIA", "seattle": "SEA", "boston": "BOS",
-        "rome": "ROM", "barcelona": "BCN", "amsterdam": "AMS",
-        "dubai": "DXB", "singapore": "SIN", "hong kong": "HKG",
-        "sydney": "SYD", "bangkok": "BKK", "seoul": "SEL", "beijing": "BJS",
-        "istanbul": "IST", "berlin": "BER", "madrid": "MAD",
-        "mumbai": "BOM", "delhi": "DEL", "taipei": "TPE",
-        "kuala lumpur": "KUL", "osaka": "OSA", "kyoto": "UKY",
-        "prague": "PRG", "vienna": "VIE", "lisbon": "LIS",
-        "athens": "ATH", "cairo": "CAI", "cape town": "CPT",
-        "buenos aires": "BUE", "mexico city": "MEX", "rio de janeiro": "RIO",
-        "hanoi": "HAN", "dublin": "DUB", "edinburgh": "EDI",
-        "copenhagen": "CPH", "stockholm": "STO", "oslo": "OSL",
-        "helsinki": "HEL", "zurich": "ZRH", "florence": "FLR",
-        "marrakech": "RAK", "havana": "HAV", "bali": "DPS",
-        "phuket": "HKT", "cancun": "CUN", "reykjavik": "REK",
-    }
-
     async def _fetch_hotels(self, city: str):
-        city_code = self._CITY_CODES.get(city.strip().lower(), city[:3].upper())
+        """Fetch hotels using dynamic city code resolution."""
+        city_code = await amadeus_service.async_get_city_code(city)
+        if not city_code:
+            logger.warning(f"No city code resolved for '{city}' — skipping Amadeus hotel search")
+            return None
+        logger.info(f"Fetching Amadeus hotels for {city} (code={city_code})")
         return await amadeus_service.async_search_hotels(
             city_code=city_code, max_results=5,
         )

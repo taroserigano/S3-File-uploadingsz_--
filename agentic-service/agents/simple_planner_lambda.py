@@ -77,12 +77,15 @@ class SimplePlanner:
                     )
                 
                 # Search for hotels (basic info)
-                city_code = city[:3].upper()
-                logger.info(f"[{run_id}] Fetching real hotel data...")
-                hotel_data = amadeus_service.search_hotels(
-                    city_code=city_code,
-                    max_results=5
-                )
+                city_code = amadeus_service.get_city_code(city)
+                if city_code:
+                    logger.info(f"[{run_id}] Fetching real hotel data for {city} (code={city_code})...")
+                    hotel_data = amadeus_service.search_hotels(
+                        city_code=city_code,
+                        max_results=5
+                    )
+                else:
+                    logger.warning(f"[{run_id}] No city code for '{city}' — skipping hotel search")
                 
             except Exception as e:
                 logger.warning(f"[{run_id}] Could not fetch Amadeus data: {e}")
@@ -310,10 +313,41 @@ Return the itinerary as JSON following the specified format."""
                             if len(stops) >= 10:
                                 break
             
-            # Ensure recommended_hotels exists, generate fallback if missing
-            recommended_hotels = itinerary_data.get("recommended_hotels", [])
+            # Ensure recommended_hotels exists, merge LLM + Amadeus + fallback
+            llm_hotels = itinerary_data.get("recommended_hotels", [])
+            amadeus_hotels = hotel_data.get("hotels", []) if hotel_data and isinstance(hotel_data, dict) else []
+
+            # Start with LLM hotels
+            recommended_hotels = []
+            for h in llm_hotels:
+                recommended_hotels.append({
+                    "name": h.get("name", "Hotel"),
+                    "rating": h.get("rating", 4.0),
+                    "price_range": h.get("price_range", "$$"),
+                    "address": h.get("address", f"{city}, {country}"),
+                    "description": h.get("description", ""),
+                    "source": "ai",
+                })
+
+            # Supplement with Amadeus hotels that aren't duplicates
+            llm_names = {h.get("name", "").lower().strip() for h in llm_hotels}
+            for h in amadeus_hotels:
+                name = h.get("name", "")
+                if name.lower().strip() in llm_names:
+                    continue
+                addr = h.get("address", {})
+                recommended_hotels.append({
+                    "name": name,
+                    "rating": 4.0,
+                    "price_range": "Contact for pricing",
+                    "address": addr.get("cityName", city) if isinstance(addr, dict) else str(addr),
+                    "description": f"Listed on Amadeus (ID: {h.get('hotelId', 'N/A')})",
+                    "source": "amadeus",
+                })
+
+            # If still empty, generate fallback
             if not recommended_hotels:
-                logger.warning(f"[{run_id}] No hotels in LLM response, generating fallback")
+                logger.warning(f"[{run_id}] No hotels from LLM or Amadeus, generating fallback")
                 recommended_hotels = [
                     {
                         "name": f"Premium Hotel {city}",
@@ -347,7 +381,7 @@ Return the itinerary as JSON following the specified format."""
                 "stops": stops[:10],  # Limit to 10 stops for display
                 "daily_schedule": itinerary_data.get("daily_schedule", []),
                 "daily_plans": itinerary_data.get("daily_plans", []),  # NEW: Detailed hour-by-hour plans
-                "recommended_hotels": recommended_hotels,  # LLM-generated or fallback hotels
+                "recommended_hotels": recommended_hotels[:5],  # LLM + Amadeus merged, capped at 5
                 "compliance": itinerary_data.get("compliance", {}),
                 "research": {
                     "highlights": itinerary_data.get("highlights", []),
@@ -355,9 +389,9 @@ Return the itinerary as JSON following the specified format."""
                     "estimated_costs": itinerary_data.get("estimated_costs", {})
                 },
                 "real_data": {
-                    "flights": flight_data.get("flights", []) if flight_data else [],
-                    "hotels": hotel_data.get("hotels", []) if hotel_data else [],
-                    "has_real_data": bool(flight_data or hotel_data)
+                    "flights": flight_data.get("flights", []) if flight_data and isinstance(flight_data, dict) else [],
+                    "hotels": amadeus_hotels,
+                    "has_real_data": bool(flight_data or amadeus_hotels)
                 },
                 "hero_image": hero_image  # Unsplash image data
             }

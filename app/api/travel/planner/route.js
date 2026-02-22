@@ -27,7 +27,7 @@ export async function POST(request) {
     if (!destination || !days) {
       return NextResponse.json(
         { error: "Destination and days are required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -50,7 +50,7 @@ export async function POST(request) {
             preferences: preferences || {},
             user_id: userId,
           }),
-        },
+        }
       );
 
       if (planResponse.ok) {
@@ -114,7 +114,7 @@ export async function POST(request) {
           destination,
           country,
           days,
-          preferences,
+          preferences
         );
       }
     } catch (err) {
@@ -124,21 +124,43 @@ export async function POST(request) {
         destination,
         country,
         days,
-        preferences,
+        preferences
       );
-    }
-
-    // Generate mock hotel data for demonstration
-    if (checkIn && checkOut) {
-      hotels = generateMockHotels(destination);
     }
 
     // Generate mock flight data for demonstration
     flights = generateMockFlights(destination);
 
+    // Ensure recommended_hotels is always inside itinerary
+    const itinerary = itineraryData.itinerary || itineraryData;
+    if (!itinerary.recommended_hotels || itinerary.recommended_hotels.length === 0) {
+      itinerary.recommended_hotels = [
+        {
+          name: `Grand ${destination} Hotel`,
+          rating: 4.5,
+          price_range: "$150-250/night",
+          address: `City Center, ${destination}`,
+          description: `Luxury hotel in the heart of ${destination} with excellent amenities.`,
+        },
+        {
+          name: `${destination} Budget Inn`,
+          rating: 3.8,
+          price_range: "$60-100/night",
+          address: `Downtown ${destination}`,
+          description: `Affordable accommodation near public transport and dining.`,
+        },
+        {
+          name: `Boutique ${destination} Suites`,
+          rating: 4.2,
+          price_range: "$120-180/night",
+          address: `${destination} Arts District`,
+          description: `Charming boutique hotel with unique decor and personalized service.`,
+        },
+      ];
+    }
+
     return NextResponse.json({
-      itinerary: itineraryData.itinerary || itineraryData,
-      hotels,
+      itinerary,
       flights,
       metadata: {
         destination,
@@ -154,143 +176,142 @@ export async function POST(request) {
     console.error("Error generating travel plan:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate travel plan" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
 function generateFallbackItinerary(destination, country, days, preferences) {
-  const city = destination;
   const activityDatabase = {
     adventure: [
       {
         name: "Mountain Hiking Trail",
-        address: `Hiking Trailhead, ${city}`,
+        address: "Mount Takao Trailhead, 2177 Takaomachi, Hachioji",
         type: "Outdoor Adventure",
       },
       {
         name: "Rock Climbing Center",
-        address: `Adventure Sports Center, ${city}`,
+        address: "5-3-2 Asakusa, Taito City",
         type: "Adventure Sport",
       },
       {
         name: "Zip Line Adventure Park",
-        address: `Adventure Park, ${city}`,
+        address: "1-8-1 Shibuya, Shibuya City",
         type: "Thrill Activity",
       },
       {
         name: "Mountain Bike Trails",
-        address: `City Park, ${city}`,
+        address: "Yoyogi Park, 2-1 Yoyogikamizonocho, Shibuya",
         type: "Outdoor Sport",
       },
     ],
     culture: [
       {
-        name: `${city} National Museum`,
-        address: `Museum Quarter, ${city}`,
+        name: "National Museum",
+        address: "13-9 Ueno Park, Taito City",
         type: "Museum",
       },
       {
-        name: "Historic Old Town District",
-        address: `Old Town, ${city}`,
+        name: "Historic Temple District",
+        address: "2-3-1 Asakusa, Taito City",
         type: "Historical Site",
       },
       {
-        name: `${city} Contemporary Art Gallery`,
-        address: `Arts District, ${city}`,
+        name: "Contemporary Art Gallery",
+        address: "6-10-1 Roppongi, Minato City",
         type: "Art Gallery",
       },
       {
-        name: "Historic Theater & Culture Center",
-        address: `Cultural Center, ${city}`,
+        name: "Traditional Theater",
+        address: "4-12-15 Ginza, Chuo City",
         type: "Cultural Venue",
       },
     ],
     food: [
       {
-        name: `${city} Central Market`,
-        address: `Central Market, ${city}`,
+        name: "Tsukiji Outer Market",
+        address: "4-16-2 Tsukiji, Chuo City",
         type: "Food Market",
       },
       {
-        name: "Local Cuisine Cooking Class",
-        address: `Culinary School, ${city}`,
+        name: "Sushi Making Class",
+        address: "3-7-12 Shibuya, Shibuya City",
         type: "Cooking Experience",
       },
       {
-        name: "Street Food Quarter",
-        address: `Street Food District, ${city}`,
+        name: "Ramen Alley",
+        address: "1-1-2 Shinjuku, Shinjuku City",
         type: "Dining District",
       },
       {
-        name: "Night Food Market",
-        address: `Night Market, ${city}`,
+        name: "Street Food Night Market",
+        address: "2-5-8 Harajuku, Shibuya City",
         type: "Food Tour",
       },
     ],
     relaxation: [
       {
-        name: "Luxury Day Spa & Wellness",
-        address: `Spa District, ${city}`,
+        name: "Traditional Onsen Spa",
+        address: "1-15-3 Odaiba, Minato City",
         type: "Spa & Wellness",
       },
       {
-        name: "Scenic Riverside Promenade",
-        address: `Riverside Walk, ${city}`,
-        type: "Scenic Walk",
+        name: "Seaside Beach Resort",
+        address: "Odaiba Seaside Park, 1-4 Daiba, Minato",
+        type: "Beach",
       },
       {
-        name: "City Panorama Viewpoint",
-        address: `Observation Deck, ${city}`,
+        name: "Sunset Observatory",
+        address: "Tokyo Skytree, 1-1-2 Oshiage, Sumida",
         type: "Scenic View",
       },
       {
-        name: "Tranquil City Gardens",
-        address: `City Gardens, ${city}`,
+        name: "Zen Meditation Temple",
+        address: "5-5-1 Shiba, Minato City",
         type: "Meditation Center",
       },
     ],
     nature: [
       {
-        name: `${city} Royal Gardens`,
-        address: `Royal Gardens, ${city}`,
+        name: "Imperial Palace Gardens",
+        address: "1-1 Chiyoda, Chiyoda City",
         type: "Garden",
       },
       {
-        name: "Botanical Garden",
-        address: `Botanical Garden, ${city}`,
+        name: "Botanical Paradise Garden",
+        address: "5-16-3 Koishikawa, Bunkyo City",
         type: "Botanical Garden",
       },
       {
-        name: `${city} Wildlife & Nature Park`,
-        address: `Nature Reserve, ${city}`,
+        name: "Wildlife Observation Park",
+        address: "Ueno Zoo, 9-83 Ueno Park, Taito",
         type: "Nature Reserve",
       },
       {
-        name: "Scenic Overlook",
-        address: `Scenic Viewpoint, ${city}`,
+        name: "Mountain Scenic Overlook",
+        address: "Mount Takao Summit, Hachioji",
         type: "Viewpoint",
       },
     ],
     shopping: [
       {
         name: "Traditional Crafts Market",
-        address: `Old Town Market, ${city}`,
+        address: "Nakamise Street, 1-36-3 Asakusa, Taito",
         type: "Market",
       },
       {
-        name: "Main Shopping District",
-        address: `Shopping District, ${city}`,
+        name: "Luxury Shopping District",
+        address: "5-2-1 Ginza, Chuo City",
         type: "Shopping Street",
       },
       {
-        name: "Souvenir & Gift Shops",
-        address: `Tourist Center, ${city}`,
+        name: "Souvenir Arcade",
+        address: "1-19-24 Kabukicho, Shinjuku",
         type: "Shopping Center",
       },
       {
-        name: "Local Artisan Workshop",
-        address: `Artisan Quarter, ${city}`,
+        name: "Pottery Workshop",
+        address: "3-12-8 Kagurazaka, Shinjuku",
         type: "Craft Studio",
       },
     ],
@@ -298,122 +319,122 @@ function generateFallbackItinerary(destination, country, days, preferences) {
 
   const restaurantDatabase = [
     {
-      name: `The ${city} Kitchen`,
-      address: `Old Town, ${city}`,
-      type: "Local Cuisine",
+      name: "Sakura Sushi Restaurant",
+      address: "2-7-4 Tsukiji, Chuo City",
+      type: "Sushi",
       price: "$$-$$$",
     },
     {
-      name: "Market Bistro",
-      address: `Central Market, ${city}`,
-      type: "Bistro",
+      name: "Ramen Ichiban",
+      address: "3-38-1 Shinjuku, Shinjuku City",
+      type: "Ramen",
       price: "$-$$",
     },
     {
-      name: "Grand Brasserie",
-      address: `Main Square, ${city}`,
-      type: "Brasserie",
+      name: "Tempura Yamamoto",
+      address: "4-5-11 Ginza, Chuo City",
+      type: "Tempura",
       price: "$$$",
     },
     {
-      name: "Heritage Restaurant",
-      address: `Heritage Quarter, ${city}`,
+      name: "Kaiseki Garden",
+      address: "2-15-2 Roppongi, Minato City",
       type: "Traditional",
       price: "$$$$",
     },
     {
-      name: "Grill & Smokehouse",
-      address: `City Center, ${city}`,
+      name: "Yakiniku Paradise",
+      address: "1-22-7 Shibuya, Shibuya City",
       type: "BBQ",
       price: "$$-$$$",
     },
     {
-      name: "Noodle & Pasta House",
-      address: `Arts District, ${city}`,
+      name: "Udon House",
+      address: "5-9-1 Asakusa, Taito City",
       type: "Noodles",
       price: "$",
     },
     {
-      name: "The Local Tavern",
-      address: `Old Quarter, ${city}`,
+      name: "Izakaya Tanaka",
+      address: "2-12-3 Ebisu, Shibuya City",
       type: "Pub Food",
       price: "$$",
     },
     {
-      name: "Fusion Kitchen",
-      address: `Restaurant Row, ${city}`,
-      type: "Fusion",
+      name: "Teppanyaki Fusion",
+      address: "6-3-1 Roppongi, Minato City",
+      type: "Teppanyaki",
       price: "$$$",
     },
     {
-      name: "Courtyard Café",
-      address: `Cultural District, ${city}`,
-      type: "Café",
+      name: "Tonkatsu Master",
+      address: "3-14-5 Akasaka, Minato City",
+      type: "Tonkatsu",
       price: "$$",
     },
     {
-      name: "Artisan Noodle Bar",
-      address: `Market Street, ${city}`,
-      type: "Noodles",
+      name: "Soba Noodle Bar",
+      address: "1-8-9 Kanda, Chiyoda City",
+      type: "Soba",
       price: "$-$$",
     },
     {
-      name: "Farmhouse Table",
-      address: `Food Quarter, ${city}`,
-      type: "Farm-to-Table",
+      name: "Okonomiyaki House",
+      address: "2-19-4 Harajuku, Shibuya City",
+      type: "Okonomiyaki",
       price: "$$",
     },
     {
-      name: "The Hot Pot Corner",
-      address: `Dining District, ${city}`,
+      name: "Shabu-Shabu Delight",
+      address: "5-7-2 Shibuya, Shibuya City",
       type: "Hot Pot",
       price: "$$-$$$",
     },
     {
-      name: "Prime Steakhouse",
-      address: `Upscale District, ${city}`,
+      name: "Wagyu Steakhouse",
+      address: "4-2-8 Ginza, Chuo City",
       type: "Steak",
       price: "$$$$",
     },
     {
-      name: "Quick Bites Deli",
-      address: `Downtown, ${city}`,
-      type: "Deli",
+      name: "Bento Corner",
+      address: "2-5-3 Shinjuku, Shinjuku City",
+      type: "Bento",
       price: "$",
     },
     {
-      name: "Spice Garden",
-      address: `Spice Quarter, ${city}`,
+      name: "Curry Village",
+      address: "3-11-6 Ikebukuro, Toshima City",
       type: "Curry",
       price: "$-$$",
     },
     {
-      name: "Harbor Seafood",
-      address: `Waterfront, ${city}`,
+      name: "Seafood Harbor",
+      address: "1-4-7 Toyosu, Koto City",
       type: "Seafood",
       price: "$$$",
     },
     {
-      name: "Open Fire Grill",
-      address: `Grill Street, ${city}`,
+      name: "Robata Grill",
+      address: "2-22-1 Ebisu, Shibuya City",
       type: "Grilled",
       price: "$$-$$$",
     },
     {
-      name: "Green Plate Vegan",
-      address: `Health District, ${city}`,
+      name: "Vegan Garden Tokyo",
+      address: "4-8-3 Omotesando, Shibuya City",
       type: "Vegan",
       price: "$$",
     },
     {
-      name: "Street Skewers & Bites",
-      address: `Street Food Lane, ${city}`,
-      type: "Grilled Skewers",
+      name: "Yakitori Alley",
+      address: "1-2-5 Yurakucho, Chiyoda City",
+      type: "Yakitori",
       price: "$$",
     },
     {
-      name: "Morning Brew Café",
-      address: `Café District, ${city}`,
+      name: "Cafe Mocha Dreams",
+      address: "3-6-9 Daikanyama, Shibuya City",
       type: "Cafe",
       price: "$",
     },
@@ -424,7 +445,7 @@ function generateFallbackItinerary(destination, country, days, preferences) {
 
   // Shuffle restaurant database for randomization
   const shuffledRestaurants = [...restaurantDatabase].sort(
-    () => Math.random() - 0.5,
+    () => Math.random() - 0.5
   );
 
   // Track used activities and restaurants to avoid duplicates
@@ -446,7 +467,7 @@ function generateFallbackItinerary(destination, country, days, preferences) {
     // Get unique afternoon activity
     let afternoonActivity =
       activityList.find(
-        (a) => !usedActivities.has(a.name) && a.name !== morningActivity.name,
+        (a) => !usedActivities.has(a.name) && a.name !== morningActivity.name
       ) || activityList[(i + 1) % activityList.length];
     usedActivities.add(afternoonActivity.name);
 
@@ -554,9 +575,32 @@ function generateFallbackItinerary(destination, country, days, preferences) {
     description: `Experience the best of ${destination}, ${
       country || destination
     } with this carefully planned ${days}-day itinerary featuring ${selectedPreferences.join(
-      ", ",
+      ", "
     )} activities.`,
     daily_plans,
+    recommended_hotels: [
+      {
+        name: `Grand ${destination} Hotel`,
+        rating: 4.5,
+        price_range: "$150-250/night",
+        address: `City Center, ${destination}`,
+        description: `Luxury hotel in the heart of ${destination} with excellent amenities and proximity to major attractions.`,
+      },
+      {
+        name: `${destination} Budget Inn`,
+        rating: 3.8,
+        price_range: "$60-100/night",
+        address: `Downtown ${destination}`,
+        description: `Affordable and comfortable accommodation near public transport and local dining.`,
+      },
+      {
+        name: `Boutique ${destination} Suites`,
+        rating: 4.2,
+        price_range: "$120-180/night",
+        address: `${destination} Arts District`,
+        description: `Charming boutique hotel with unique decor, rooftop views, and personalized service.`,
+      },
+    ],
   };
 }
 
@@ -565,10 +609,11 @@ function generateMockHotels(destination) {
     {
       id: "hotel1",
       name: `Grand ${destination} Hotel`,
-      location: {},
+      location: { latitude: 35.6762, longitude: 139.6503 },
       address: {
         lines: ["123 Main Street"],
         cityName: destination,
+        countryCode: "JP",
       },
       price: { total: "150", currency: "USD" },
       rating: 4.5,
@@ -576,10 +621,11 @@ function generateMockHotels(destination) {
     {
       id: "hotel2",
       name: `${destination} Plaza`,
-      location: {},
+      location: { latitude: 35.6812, longitude: 139.7671 },
       address: {
         lines: ["456 Central Avenue"],
         cityName: destination,
+        countryCode: "JP",
       },
       price: { total: "120", currency: "USD" },
       rating: 4.2,
@@ -587,10 +633,11 @@ function generateMockHotels(destination) {
     {
       id: "hotel3",
       name: `Boutique ${destination} Inn`,
-      location: {},
+      location: { latitude: 35.6595, longitude: 139.7004 },
       address: {
         lines: ["789 Garden Road"],
         cityName: destination,
+        countryCode: "JP",
       },
       price: { total: "95", currency: "USD" },
       rating: 4.0,
@@ -599,31 +646,30 @@ function generateMockHotels(destination) {
 }
 
 function generateMockFlights(destination) {
-  const dest = destination.toUpperCase().slice(0, 3);
   return [
     {
       id: "flight1",
       price: { total: "650", currency: "USD" },
       itineraries: [
         {
-          duration: "PT10H00M",
+          duration: "PT12H30M",
           segments: [
             {
-              departure: { airport: "JFK", time: "2026-03-01T10:00:00" },
-              arrival: { airport: dest, time: "2026-03-01T20:00:00" },
+              departure: { airport: "LAX", time: "2026-01-20T10:00:00" },
+              arrival: { airport: "NRT", time: "2026-01-21T14:30:00" },
               carrier: "AA",
-              flight_number: "100",
+              flight_number: "170",
             },
           ],
         },
         {
-          duration: "PT10H00M",
+          duration: "PT11H45M",
           segments: [
             {
-              departure: { airport: dest, time: "2026-03-08T12:00:00" },
-              arrival: { airport: "JFK", time: "2026-03-08T22:00:00" },
+              departure: { airport: "NRT", time: "2026-01-22T16:00:00" },
+              arrival: { airport: "LAX", time: "2026-01-22T10:45:00" },
               carrier: "AA",
-              flight_number: "101",
+              flight_number: "171",
             },
           ],
         },
@@ -634,24 +680,24 @@ function generateMockFlights(destination) {
       price: { total: "580", currency: "USD" },
       itineraries: [
         {
-          duration: "PT11H00M",
+          duration: "PT13H15M",
           segments: [
             {
-              departure: { airport: "LAX", time: "2026-03-01T14:00:00" },
-              arrival: { airport: dest, time: "2026-03-02T01:00:00" },
+              departure: { airport: "LAX", time: "2026-01-20T14:00:00" },
+              arrival: { airport: "HND", time: "2026-01-21T18:15:00" },
               carrier: "UA",
-              flight_number: "200",
+              flight_number: "32",
             },
           ],
         },
         {
-          duration: "PT11H00M",
+          duration: "PT12H30M",
           segments: [
             {
-              departure: { airport: dest, time: "2026-03-08T08:00:00" },
-              arrival: { airport: "LAX", time: "2026-03-08T19:00:00" },
+              departure: { airport: "HND", time: "2026-01-22T12:00:00" },
+              arrival: { airport: "LAX", time: "2026-01-22T07:30:00" },
               carrier: "UA",
-              flight_number: "201",
+              flight_number: "33",
             },
           ],
         },
