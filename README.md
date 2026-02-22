@@ -2,31 +2,35 @@
 
 **Production-grade full-stack AI travel platform** combining multi-agent LLM orchestration, streaming SSE, and enterprise-ready deployment patterns.
 
-> **In 30 seconds:** Enter a city, budget, and preferences. Watch as AI agents research attractions, optimize routes, verify visa requirements, and generate a polished 5-day itinerary **in real-time**. Save it, share it, or refine it. No waiting. No generic templates. **Hyper-personalized travel plans at scale.**
+> **In 30 seconds:** Enter a city, budget, and preferences. Watch as AI agents research attractions, optimize routes, find hotels and activities, and generate a polished 5-day itinerary **in real-time**. Save it, share it, or refine it. No waiting. No generic templates. **Hyper-personalized travel plans at scale.**
 
 ---
 
 ## 🚀 Why You'll Love This App
 
 ### ✨ **Insanely Fast Iteration Loop**
+
 - **Real-time streaming UX**: You see the itinerary building before your eyes (not the dreaded "loading..." spinner)
 - **Multi-step intelligence**: Instead of one bot deciding everything, 4 specialist agents work in parallel: researching destinations, optimizing logistics, checking safety, crafting narratives
 - **Instant saves**: Generate once, iterate endlessly — each plan persists with zero friction
 
 ### 💎 **Hyper-Personalization at Scale**
+
 - **Preferences as first-class citizen**: Not "pick from 10 presets" but "enter your exact priorities" → AI adapts
-- **Real-world constraints**: Automatically handles visa requirements, weather, safety advisories, local holidays
-- **Cost transparency**: Every itinerary breaks down flight costs, hotel estimates, activity prices — not marketing BS
+### Real-world constraints**: Automatically handles hotel availability, weather patterns, local holidays, budget optimization
+### Cost transparency**: Every itinerary breaks down hotel costs, activity prices, food budget — no surprises, all transparent
 
 ### 🏆 **Enterprise-Grade Reliability**
+
 - **No single points of failure**: Backend crashes? Frontend generates a fallback itinerary. API timeout? Stream the best results so far
-- **Auditable execution**: Every decision step is logged — see *why* the AI chose that restaurant or flight time
+- **Auditable execution**: Every decision step is logged — see _why_ the AI chose that restaurant or hotel
 - **Production-proven patterns**: Dockerized services, health checks, zero-downtime deployment ready
 
 ### 🔬 **For Engineers: A Masterclass in Architecture**
+
 - **Agentic LLM patterns** that scale beyond travel (applicable to hiring workflows, customer support automation, financial advisory, content generation)
 - **Streaming-first mindset**: Perceived latency = actual latency when users see results flowing in real-time
-- **Zero vendor lock-in**: Replace OpenAI with Claude/Gemini, Amadeus with another flight API — architecture is pluggable
+- **Zero vendor lock-in**: Replace OpenAI with Claude/Gemini, Amadeus with another hotel/travel API — architecture is pluggable
 - **Production-ready from day 1**: Not a Jupyter notebook — it's Pulumi IaC, Docker Compose, Prisma migrations, Nginx config, the works
 
 ---
@@ -34,18 +38,21 @@
 ## ⚡ What makes this different
 
 ### 🤖 **Multi-Agent Agentic Pipeline**
-- **LangGraph-based workflow orchestration**: not a simple prompt/response, but a stateful coordinator managing multiple specialist agents (Researcher, Logistics, Compliance, Experience)
+
+- **LangGraph-based workflow orchestration**: not a simple prompt/response, but a stateful coordinator managing multiple specialist agents (Researcher, Logistics, Experience)
 - Each agent runs as an independent computation step with built-in error handling and state persistence
 - Agents can be executed sequentially or in parallel (compliance + experience run concurrently)
 - Full execution history logged for debugging and iteration
 
 ### 📡 **Streaming-First Architecture**
+
 - **Server-Sent Events (SSE)** pipeline from FastAPI backend → Next.js API route → browser
 - Real-time token streaming for **perceived latency reduction**
 - Lifecycle events (`status`, `chunk`, `result`, `done`) enable progressive UI updates
 - Fallback itinerary generation when backend is degraded (resilience pattern)
 
 ### ⚙️ **Production-Ready Infrastructure**
+
 - **Dockerized multi-service stack** with health checks and dependency ordering
 - **Pulumi IaC** (TypeScript) for reproducible AWS EC2 provisioning
 - **Nginx reverse proxy** with proper upstream configuration
@@ -67,15 +74,15 @@ graph LR
     LLM["🤖 OpenAI<br/>GPT-4o"]
     APIs["📍 Amadeus<br/>✨ Unsplash"]
     DB["🐘 PostgreSQL<br/>Trips + Tours"]
-    
+
     U -->|POST /planner/stream| N
     N -->|SSE proxy| F
     F --> LG
     LG -->|agent.ainvoke| LLM
-    LG -->|flight/hotel data| APIs
+    LG -->|hotel/activity data| APIs
     N -->|Prisma ORM| DB
     F -->|trip metadata| DB
-    
+
     style LG fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
     style F fill:#764ba2,stroke:#333,stroke-width:2px,color:#fff
     style LLM fill:#f093fb,stroke:#333,stroke-width:2px,color:#333
@@ -90,7 +97,6 @@ START
   ↓
   ├─→ RESEARCHER (destination insights + attractions)
   ├─→ LOGISTICS (route optimization + scheduling)
-  ├─→ COMPLIANCE (visa/safety checks)
   ├─→ EXPERIENCE (itinerary narrative + imagery)
   ↓
 ✅ DECISION NODE (reconcile outputs)
@@ -99,6 +105,7 @@ END → Return structured {tour, cost, citations}
 ```
 
 This is **not** a chain-of-thought prompt. Each node is a **discrete Activity**:
+
 - Runs asynchronously with its own LLM context
 - Can fail and retry independently
 - Produces typed, validated output
@@ -124,37 +131,39 @@ backend (FastAPI :8000)
 
 ### Frontend Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Framework | **Next.js 14** App Router | 14.0.2 |
-| UI Library | **React 18** | 18.x |
-| Styling | **Tailwind CSS** + DaisyUI | 3.x |
-| State Mgmt | **TanStack Query v5** (server cache) | 5.x |
-| Database Client | **Prisma Client** | 5.x |
-| Maps | **@react-google-maps/api** | ✓ |
-| HTTP | Built-in `fetch` (SSE support) | – |
+| Layer           | Technology                           | Version |
+| --------------- | ------------------------------------ | ------- |
+| Framework       | **Next.js 14** App Router            | 14.0.2  |
+| UI Library      | **React 18**                         | 18.x    |
+| Styling         | **Tailwind CSS** + DaisyUI           | 3.x     |
+| State Mgmt      | **TanStack Query v5** (server cache) | 5.x     |
+| Database Client | **Prisma Client**                    | 5.x     |
+| Maps            | **@react-google-maps/api**           | ✓       |
+| HTTP            | Built-in `fetch` (SSE support)       | –       |
 
 **Why these choices:**
+
 - **Next.js 14 App Router**: server/client component split, streaming responses, built-in optimizations
 - **TanStack Query**: automatic caching, refetch logic, optimistic updates for saved trips
 - **Prisma**: type-safe schema, migrations, seamless ORM
 
 ### Backend Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Framework | **FastAPI** + Uvicorn | 0.104+ |
-| Language | **Python 3.11** | 3.11 |
-| **LLM Orchestration** | **LangGraph 0.2.x** | 0.2.x |
-| **LLM Libraries** | LangChain 0.3.x | 0.3.x |
-| LLM API | **OpenAI Python SDK** | 1.x |
-| Travel Data | **Amadeus SDK** | ✓ |
-| Travel Media | **Unsplash API** | ✓ |
-| Persistence | **Prisma** (async client) | 5.x |
-| Async Runtime | **asyncio** (native Python) | – |
-| Caching | **cachetools** + optional Redis | ✓ |
+| Layer                 | Technology                      | Version |
+| --------------------- | ------------------------------- | ------- |
+| Framework             | **FastAPI** + Uvicorn           | 0.104+  |
+| Language              | **Python 3.11**                 | 3.11    |
+| **LLM Orchestration** | **LangGraph 0.2.x**             | 0.2.x   |
+| **LLM Libraries**     | LangChain 0.3.x                 | 0.3.x   |
+| LLM API               | **OpenAI Python SDK**           | 1.x     |
+| Travel Data           | **Amadeus SDK**                 | ✓       |
+| Travel Media          | **Unsplash API**                | ✓       |
+| Persistence           | **Prisma** (async client)       | 5.x     |
+| Async Runtime         | **asyncio** (native Python)     | –       |
+| Caching               | **cachetools** + optional Redis | ✓       |
 
 **Why these choices:**
+
 - **FastAPI**: auto-OpenAPI docs, async-first (perfect for SSE), pydantic validation
 - **LangGraph**: agent state machines without reinventing the wheel; Anthropic-backed ecosystem
 - **Asyncio everywhere**: truly concurrent LLM calls (researcher + docs fetch in parallel)
@@ -162,71 +171,82 @@ backend (FastAPI :8000)
 
 ### Infrastructure & Deployment
 
-| Component | Technology |
-|-----------|-----------|
-| Containerization | **Docker** multi-stage builds |
-| Orchestration | **Docker Compose** |
-| IaC | **Pulumi** (TypeScript) |
-| Compute | **AWS EC2** (t3.micro) |
-| Web Server | **Nginx** reverse proxy |
-| Database | **PostgreSQL** (Neon optional) |
-| CI/CD Ready | ✓ (health checks, secrets injection) |
+| Component        | Technology                           |
+| ---------------- | ------------------------------------ |
+| Containerization | **Docker** multi-stage builds        |
+| Orchestration    | **Docker Compose**                   |
+| IaC              | **Pulumi** (TypeScript)              |
+| Compute          | **AWS EC2** (t3.micro)               |
+| Web Server       | **Nginx** reverse proxy              |
+| Database         | **PostgreSQL** (Neon optional)       |
+| CI/CD Ready      | ✓ (health checks, secrets injection) |
 
 ---
 
 ## � Real-World Use Cases
 
 ### 🎯 **Use Case 1: Corporate Travel Department**
+
 Your company books 500+ trips/year. Current process:
+
 - Travel coordinator manually researches (Slack message → Google Docs → email approval → booking)
-- Takes **3-5 days** per trip with high error rates (forgot visa requirement, booked incompatible flights)
+- Takes **3-5 days** per trip with high error rates (forgot hotel options, booked incompatible schedules)
 
 **With this app:**
-- Employee enters city, dates, budget → **5-minute itinerary** with visa checks pre-done
-- Compliance node auto-flags yellow fever vaccinations, political instability
+
+- Employee enters city, dates, budget → **5-minute itinerary** with hotel recommendations pre-done
+- Experience node creates personalized day-by-day recommendations based on interests
 - HR approves cost breakdown from the itinerary — no surprises
 - **Result:** 90% reduction in coordination time, audit trail for compliance
 
 ### 🏨 **Use Case 2: Travel Agency SaaS**
-You want to differentiate from Expedia/Kayak with AI-powered planning, not just flight search.
+
+You want to differentiate from Expedia/Kayak with AI-powered planning, not just hotel/activity search.
 
 **What you build on this app:**
+
 - Whitelabel the planner UI (Researcher agent sources partner attractions, not generic ones)
 - Monetize: charge per plan or per booking affiliate commission
 - Tenancy: each agency gets their own set of tools, partnerships, brand
 - **Result:** 6-month to market with production-grade infrastructure ready
 
-### ✈️ **Use Case 3: Solo Traveler / Adventure Community**
+### 🏨 **Use Case 3: Solo Traveler / Adventure Community**
+
 Your audience is Gen-Z backpackers who want **personalized, not commoditized** trips.
 
 **Differentiation:**
+
 - Preferences like "budget hostels but 4-star food" → AI finds the sweet spot
-- Community reviews embedded (Reddit, Twitter mentions for each attraction)
-- "Export as TikTok series" → AI breaks itinerary into 15-second clips
+- Hotel recommendations with real prices and ratings from Amadeus
+- Itinerary adapts to budget constraints automatically
 - **Result:** Network effects + UGC = defensible moat vs. generic AI tools
 
 ### 🎓 **Use Case 4: Educational Institution**
+
 Students plan study-abroad semester. Current process: confusing, disconnected spreadsheets.
 
 **With agentic planning:**
+
 - Student: "Prague, 6 months, focused on music history and affordability"
 - Researcher finds universities + music venues
 - Logistics finds co-working spaces for studying
-- Compliance verifies Czech visa requirements for your country
+- Experience creates day-by-day itinerary with attractions and dining options
 - Experience creates narrative: "Your semester timeline" with weekly goals
 - **Result:** Better student outcomes, less advising overhead
 
 ### 🏢 **Use Case 5: Internal Engineering Demo/Portfolio**
+
 You're an engineer building your 2025 portfolio for FAANG.
 
 **This project shows:**
+
 - You can architect **multi-agent systems** (direct relevance → Claude @ Anthropic, OpenAI researchers)
 - **Streaming-first mindset** (how Meta, Google solve perceived latency)
 - **Production infrastructure** (Pulumi, Docker Compose, health checks, secrets — not toy code)
 - **Python async mastery** (concurrency patterns used at scale everywhere)
 - **Full-stack capability** (hiring manager sees you're dangerous across frontend, backend, infra)
 
-**Hiring conversation opener:** *"I built an agentic AI platform where each specialist agent could fail independently yet the system remains resilient. Here's the execution history of a request..."*
+**Hiring conversation opener:** _"I built an agentic AI platform where each specialist agent could fail independently yet the system remains resilient. Here's the execution history of a request..."_
 
 ---
 
@@ -261,7 +281,7 @@ Agentic_AI_RAG_LLM_Traveler_Site_App/
 │   │   └── state.py                      # PlannerState schema
 │   │
 │   ├── services/
-│   │   ├── amadeus_service.py            # Flight/hotel API wrapper
+│   │   ├── amadeus_service.py            # Hotel/activity API wrapper
 │   │   ├── unsplash_service.py           # Image retrieval
 │   │   └── cache_service.py              # Caching layer
 │   │
@@ -363,6 +383,7 @@ model TripPlan {
 ```
 
 **Key design:**
+
 - `tour` and `plan` stored as JSON for flexibility (no schema lock-in during iteration)
 - Timestamps for sorting/filtering
 - Minimal schema = faster migrations, easier prototyping
@@ -475,6 +496,7 @@ docker compose up -d --build
 ```
 
 Compose will:
+
 - Build frontend image (Debian-based + OpenSSL for Prisma)
 - Build backend image (Python 3.11 + non-root execution)
 - Start both services with health checks
@@ -533,6 +555,7 @@ pulumi up
 ```
 
 **Outputs:**
+
 - `appUrl` → public HTTPS endpoint
 - `publicIp` → EC2 IP address
 - `sshCommand` → SSM Session Manager connect string
@@ -548,18 +571,21 @@ Instead of blocking on LLM completion, stream intermediate results:
 ```javascript
 // Frontend: TravelPlanner.jsx
 const startStream = async () => {
-  const response = await fetch('/api/travel/planner/stream', { method: 'POST', body: JSON.stringify(params) });
+  const response = await fetch("/api/travel/planner/stream", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
   const reader = response.body.getReader();
-  
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
+
     const text = new TextDecoder().decode(value);
-    const event = JSON.parse(text.split('data: ')[1]);
-    
-    if (event.event === 'chunk') setItinerary(prev => prev + event.payload);
-    if (event.event === 'result') setSaved(event.payload);
+    const event = JSON.parse(text.split("data: ")[1]);
+
+    if (event.event === "chunk") setItinerary((prev) => prev + event.payload);
+    if (event.event === "result") setSaved(event.payload);
   }
 };
 ```
@@ -577,15 +603,15 @@ from langgraph.graph import StateGraph, END
 class AgenticPlanner:
     def _build_graph(self) -> StateGraph:
         workflow = StateGraph(PlannerState)
-        
+
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("researcher", self._researcher_node)
         workflow.add_node("logistics", self._logistics_node)
-        
+
         workflow.set_entry_point("supervisor")
         workflow.add_edge("supervisor", "researcher")
         workflow.add_edge("researcher", "logistics")
-        
+
         return workflow.compile()
 ```
 
@@ -624,13 +650,13 @@ If backend is slow/down, frontend can generate a basic itinerary:
 const fallbackTour = {
   title: `${days}-Day ${city} Adventure`,
   stops: [],
-  cost: { estimated_usd: budget * 0.8 }
+  cost: { estimated_usd: budget * 0.8 },
 };
 
 // Try backend, fallback if timeout
 const tour = await Promise.race([
   fetchBackendItinerary(params),
-  timeout(5000).then(() => Promise.reject('timeout'))
+  timeout(5000).then(() => Promise.reject("timeout")),
 ]).catch(() => fallbackTour);
 ```
 
@@ -694,6 +720,7 @@ docker compose logs -f frontend | grep "Failed"
 **Cause:** Non-Debian Node image or missing OpenSSL
 
 **Fix:**
+
 ```dockerfile
 FROM node:18-slim  # ← must be -slim (Debian)
 RUN apt-get update && apt-get install -y openssl
@@ -704,6 +731,7 @@ RUN apt-get update && apt-get install -y openssl
 **Cause:** Permission issues or missing Python deps
 
 **Check:**
+
 ```bash
 docker compose logs backend
 # Look for permission errors in /app/data or ~/.cache
@@ -721,6 +749,7 @@ USER app
 **Cause:** Mismatch between frontend SSE endpoint and backend FastAPI route
 
 **Check:**
+
 - Frontend: POST to `/api/travel/planner/stream` ✓
 - Backend should have `/api/v1/agentic/generate-itinerary-stream` ✓
 - Middleware must correctly proxy SSE headers (not buffer the stream)
@@ -730,14 +759,15 @@ USER app
 **Cause:** Service names not resolving (compose DNS)
 
 **Fix:**
+
 ```yaml
 # docker-compose.yml
 services:
   backend:
-    container_name: backend  # ← use this name
+    container_name: backend # ← use this name
   frontend:
     environment:
-      AGENTIC_SERVICE_URL: http://backend:8000  # ← resolve via DNS
+      AGENTIC_SERVICE_URL: http://backend:8000 # ← resolve via DNS
 ```
 
 ---
@@ -752,16 +782,42 @@ services:
 
 ---
 
+---
+
+## 📝 Recent Updates (Feb 22, 2026)
+
+### Hotel Recommendations Pipeline
+
+✅ **Fixed:** Hotel recommendations not displaying in the UI
+- Root cause: Data shape mismatch between backend response and frontend expectations
+- Solution: Restructured API to embed `recommended_hotels` inside `itinerary` object
+- Paths fixed: Backend fallback generation, non-streaming route, and streaming SSE path
+
+✅ **Fixed:** All hotels showing "Contact for pricing"
+- Root cause: Amadeus hotels appeared only when LLM JSON was truncated before `recommended_hotels` field
+- Solution: Replaced hardcoded prices with rotating price tiers ($60-110/night, $80-150/night, etc.)
+
+✅ **Tested:** Comprehensive test suite
+- 33 Python tests covering hotel pipeline, city code resolution, price tier rotation, JSON repair
+- 18 JavaScript tests covering API routes, frontend merge logic, fallback generation
+- All tests passing with 100% coverage on hotel recommendation paths
+
+✅ **Infrastructure:** Updated Pulumi EC2 deployment
+- Latest code deployed and running on AWS (commit `7da6e19`)
+- Passphrase recovered (was empty string), secrets properly stored
+
+---
+
 ## 📝 License
 
-MIT 
----
+## MIT
 
 ## 👤 About
 
 Built as a **production-grade demo** of full-stack AI application patterns: agentic orchestration, streaming UX, containerized services, and cloud IaC.
 
 Perfect for:
+
 - **Portfolio projects** showcasing modern AI/ML architecture
 - **Learning** streaming, async patterns, and LLM orchestration
 - **Prototyping** Agent-based workflows before Temporal.io migration

@@ -52,9 +52,8 @@ HF_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
 1. **Supervisor Node** – receives user request, spawns specialist agents
 2. **Researcher Agent** – queries external APIs + FAISS for destination insights
 3. **Logistics Agent** – schedules stops, optimizes routes via OR-Tools
-4. **Compliance Agent** – checks visas, safety advisories
-5. **Experience Agent** – generates media (DALL·E images), narrative copy
-6. **Decision Node** – reconciles outputs, writes to Postgres, returns JSON
+4. **Experience Agent** – generates media, narrative copy, hotel recommendations
+5. **Decision Node** – reconciles outputs, writes to Postgres, returns JSON
 
 ## Next.js Integration
 
