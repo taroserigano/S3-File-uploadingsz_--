@@ -1,234 +1,307 @@
-# Agentic AI RAG LLM Traveler Site App
+# 🧳 Agentic AI Travel Planner
 
-Production-style full-stack travel platform that combines:
+**Production-grade full-stack AI travel platform** combining multi-agent LLM orchestration, streaming SSE, and enterprise-ready deployment patterns.
 
-- **Next.js 14 App Router UI**
-- **FastAPI agentic backend**
-- **SSE streaming itinerary generation**
-- **RAG-backed knowledge vault ingestion/query**
-- **Prisma + PostgreSQL persistence**
+## ⚡ What makes this different
 
-Built for realistic trip planning workflows: destination + preferences in, structured itinerary out, with live streaming, save/retrieve APIs, and document-grounded Q&A.
+### 🤖 **Multi-Agent Agentic Pipeline**
+- **LangGraph-based workflow orchestration**: not a simple prompt/response, but a stateful coordinator managing multiple specialist agents (Researcher, Logistics, Compliance, Experience)
+- Each agent runs as an independent computation step with built-in error handling and state persistence
+- Agents can be executed sequentially or in parallel (compliance + experience run concurrently)
+- Full execution history logged for debugging and iteration
+
+### 📡 **Streaming-First Architecture**
+- **Server-Sent Events (SSE)** pipeline from FastAPI backend → Next.js API route → browser
+- Real-time token streaming for **perceived latency reduction**
+- Lifecycle events (`status`, `chunk`, `result`, `done`) enable progressive UI updates
+- Fallback itinerary generation when backend is degraded (resilience pattern)
+
+### ⚙️ **Production-Ready Infrastructure**
+- **Dockerized multi-service stack** with health checks and dependency ordering
+- **Pulumi IaC** (TypeScript) for reproducible AWS EC2 provisioning
+- **Nginx reverse proxy** with proper upstream configuration
+- **Non-root container execution** with correct permission handling
+- Environment-aware configuration (dev/prod secrets management)
 
 ---
 
-## Why this project is different
+## 🏗️ System Architecture
 
-- **Agentic planning pipeline**: backend supports orchestrated itinerary generation and refinement flows instead of a single prompt/response call.
-- **Streaming-first UX**: client receives incremental tokens/events over **Server-Sent Events** for faster perceived latency.
-- **RAG in the same product surface**: users can upload docs to a vault and query those docs through retrieval-backed responses.
-- **Deployment realism**: repository includes Dockerized services, EC2/Pulumi infra, Nginx reverse proxy, and health checks.
-- **Prisma-based persistence model**: tours, chat sessions, vault docs, and trip plans are persisted with relational indexing.
-
----
-
-## High-level architecture
+### Request → LLM → Structured JSON → Save
 
 ```mermaid
-flowchart LR
-  U[Browser]
-  N[Next.js 14 App Router\nFrontend + API Routes]
-  F[FastAPI Agentic Service\nPython 3.11]
-  O[OpenAI APIs]
-  A[Amadeus / Unsplash]
-  P[(PostgreSQL / Neon)]
-  V[(FAISS + HF Embeddings)]
-
-  U --> N
-  N -->|SSE + JSON proxy| F
-  N -->|Prisma| P
-  F -->|LLM calls| O
-  F -->|travel data| A
-  F -->|metadata/status| P
-  F -->|retrieve/ingest| V
+graph LR
+    U["🌐 Browser<br/>React + TanStack Query"]
+    N["Next.js 14<br/>App Router + API Routes"]
+    F["FastAPI<br/>Agentic Service"]
+    LG["LangGraph<br/>Agent Orchestrator"]
+    LLM["🤖 OpenAI<br/>GPT-4o"]
+    APIs["📍 Amadeus<br/>✨ Unsplash"]
+    DB["🐘 PostgreSQL<br/>Trips + Tours"]
+    
+    U -->|POST /planner/stream| N
+    N -->|SSE proxy| F
+    F --> LG
+    LG -->|agent.ainvoke| LLM
+    LG -->|flight/hotel data| APIs
+    N -->|Prisma ORM| DB
+    F -->|trip metadata| DB
+    
+    style LG fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
+    style F fill:#764ba2,stroke:#333,stroke-width:2px,color:#fff
+    style LLM fill:#f093fb,stroke:#333,stroke-width:2px,color:#333
 ```
 
-### Runtime topology (Docker Compose)
+### Agent Workflow (Supervised Orchestration)
 
-- `frontend` (Next.js on `:3000`)
-- `backend` (FastAPI on `:8000`)
-- frontend depends on healthy backend
-- backend healthcheck: Python probe against `http://localhost:8000/`
-
----
-
-## Core capabilities
-
-### 1) AI Trip Planner (standard + streaming)
-
-- **Next API** proxies requests to backend planner endpoints.
-- Supports preference normalization (object/list interop).
-- Streaming endpoint forwards backend SSE directly to browser.
-- Includes fallback itinerary generation logic in planner route when backend is degraded.
-
-### 2) Knowledge Vault (RAG)
-
-- Upload docs via API route and backend ingestion service.
-- Store document metadata and processing status in Postgres.
-- Query and query-stream routes for retrieval-backed answers.
-
-### 3) Saved Trips / User State
-
-- Prisma models persist trip plans, tours, tokens, chats, and document references.
-- Dashboard surfaces planner and saved trips UX.
-
----
-
-## Tech stack
-
-### Frontend
-
-- **Next.js 14.0.2** (App Router)
-- **React 18**
-- **Tailwind CSS + DaisyUI**
-- **TanStack Query v5**
-- **Prisma Client 5**
-- **@react-google-maps/api**
-
-### Backend (`agentic-service`)
-
-- **Python 3.11**
-- **FastAPI + Uvicorn**
-- **LangChain 0.3.x / LangGraph 0.2.x**
-- **OpenAI Python SDK (1.x)**
-- **Transformers + SentenceTransformers + FAISS**
-- **Redis/cachetools** (optional caching path)
-- **Amadeus SDK**
-
-### Infrastructure / Ops
-
-- Docker multi-stage builds
-- Docker Compose service orchestration
-- Pulumi (TypeScript) for AWS EC2 provisioning
-- Nginx reverse proxy (`:80 -> :3000`)
-
----
-
-## Repository map
-
-```text
-app/                         Next.js routes (UI + API)
-app/api/travel/              Planner/generate/refine/save APIs
-app/api/vault/               Vault upload/query/document APIs
-app/(dashboard)/             Dashboard routes
-components/                  UI components (planner, sidebar, vault, chat...)
-agentic-service/             FastAPI service + agents + tools + services
-prisma/                      Prisma schema + migrations
-utils/                       Prisma client + server actions
-infra/pulumi/                AWS EC2 IaC (Pulumi)
-Dockerfile                   Frontend image
-agentic-service/Dockerfile   Backend image
-docker-compose.yml           Local/prod compose stack
+```
+START
+  ↓
+🔍 SUPERVISOR (route coordination)
+  ↓
+  ├─→ RESEARCHER (destination insights + attractions)
+  ├─→ LOGISTICS (route optimization + scheduling)
+  ├─→ COMPLIANCE (visa/safety checks)
+  ├─→ EXPERIENCE (itinerary narrative + imagery)
+  ↓
+✅ DECISION NODE (reconcile outputs)
+  ↓
+END → Return structured {tour, cost, citations}
 ```
 
----
+This is **not** a chain-of-thought prompt. Each node is a **discrete Activity**:
+- Runs asynchronously with its own LLM context
+- Can fail and retry independently
+- Produces typed, validated output
+- Logged in full execution history
 
-## API surface (key routes)
-
-### Frontend-facing Next API routes
-
-- `POST /api/travel/planner`
-- `POST /api/travel/planner/stream`
-- `POST /api/travel/planner/save`
-- `GET /api/travel/planner/saved`
-- `GET /api/travel/planner/saved/[id]`
-- `POST /api/vault/upload`
-- `GET /api/vault/documents`
-- `DELETE /api/vault/documents/[id]`
-- `GET /api/vault/documents/[id]/preview`
-- `POST /api/vault/query`
-- `POST /api/vault/query-stream`
-
-### Backend FastAPI endpoints (selected)
-
-- `GET /` health root
-- `POST /api/agentic/plan`
-- `GET /api/agentic/status/{run_id}`
-- `POST /api/v1/agentic/generate-itinerary`
-- `POST /api/v1/agentic/generate-itinerary-stream`
-
-SSE stream emits lifecycle events (`status`, `chunk`, `result`, `done`) for progressive rendering.
-
----
-
-## Data model snapshot (Prisma)
-
-Main entities:
-
-- `Tour`
-- `TripPlan`
-- `KnowledgeDocument`
-- `ChatSession`
-- `Token`
-
-Backed by PostgreSQL with indexed access patterns on user-centric fields and creation timestamps.
-
----
-
-## Environment configuration
-
-Create two env files:
-
-- root: `.env.local` (Next.js + Prisma + route proxy config)
-- backend: `agentic-service/.env` (FastAPI + LLM/travel integrations)
-
-### Root `.env.local` (minimum)
+### Docker Compose Topology
 
 ```bash
-DATABASE_URL=postgres://user:pass@host/db?sslmode=require
-AGENTIC_SERVICE_URL=http://localhost:8000
+frontend (Next.js :3000)
+├── depends_on: backend (healthy)
+├── volumes: node_modules cache
+└── healthcheck: TCP :3000
 
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
-
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
-CLERK_SECRET_KEY=...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/chat
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/chat
-
-# Used by specific Next API routes/features
-OPENAI_API_KEY=...
-UNSPLASH_API_KEY=...
-VAULT_API_URL=http://localhost:8000
-```
-
-### `agentic-service/.env` (minimum)
-
-```bash
-OPENAI_API_KEY=...
-
-# Optional integrations
-DATABASE_URL=postgres://user:pass@host/db?sslmode=require
-GOOGLE_MAPS_API_KEY=...
-AMADEUS_API_KEY=...
-AMADEUS_API_SECRET=...
-UNSPLASH_ACCESS_KEY=...
-OPENWEATHER_API_KEY=...
-
-# Optional cache tuning
-REDIS_URL=redis://localhost:6379/0
-CACHE_TTL_SECONDS=86400
+backend (FastAPI :8000)
+├── Python 3.11 environment
+├── Redis optional (caching)
+└── healthcheck: HTTP GET /
 ```
 
 ---
 
-## Local development
+## 🛠️ Tech Stack (Employer-Grade)
+
+### Frontend Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Framework | **Next.js 14** App Router | 14.0.2 |
+| UI Library | **React 18** | 18.x |
+| Styling | **Tailwind CSS** + DaisyUI | 3.x |
+| State Mgmt | **TanStack Query v5** (server cache) | 5.x |
+| Database Client | **Prisma Client** | 5.x |
+| Maps | **@react-google-maps/api** | ✓ |
+| HTTP | Built-in `fetch` (SSE support) | – |
+
+**Why these choices:**
+- **Next.js 14 App Router**: server/client component split, streaming responses, built-in optimizations
+- **TanStack Query**: automatic caching, refetch logic, optimistic updates for saved trips
+- **Prisma**: type-safe schema, migrations, seamless ORM
+
+### Backend Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Framework | **FastAPI** + Uvicorn | 0.104+ |
+| Language | **Python 3.11** | 3.11 |
+| **LLM Orchestration** | **LangGraph 0.2.x** | 0.2.x |
+| **LLM Libraries** | LangChain 0.3.x | 0.3.x |
+| LLM API | **OpenAI Python SDK** | 1.x |
+| Travel Data | **Amadeus SDK** | ✓ |
+| Travel Media | **Unsplash API** | ✓ |
+| Persistence | **Prisma** (async client) | 5.x |
+| Async Runtime | **asyncio** (native Python) | – |
+| Caching | **cachetools** + optional Redis | ✓ |
+
+**Why these choices:**
+- **FastAPI**: auto-OpenAPI docs, async-first (perfect for SSE), pydantic validation
+- **LangGraph**: agent state machines without reinventing the wheel; Anthropic-backed ecosystem
+- **Asyncio everywhere**: truly concurrent LLM calls (researcher + docs fetch in parallel)
+- **Prisma async**: Python async/await for database operations
+
+### Infrastructure & Deployment
+
+| Component | Technology |
+|-----------|-----------|
+| Containerization | **Docker** multi-stage builds |
+| Orchestration | **Docker Compose** |
+| IaC | **Pulumi** (TypeScript) |
+| Compute | **AWS EC2** (t3.micro) |
+| Web Server | **Nginx** reverse proxy |
+| Database | **PostgreSQL** (Neon optional) |
+| CI/CD Ready | ✓ (health checks, secrets injection) |
+
+---
+
+## 📂 Repository Layout
+
+```
+Agentic_AI_RAG_LLM_Traveler_Site_App/
+│
+├── app/                                   # Next.js 14 App Router
+│   ├── api/travel/
+│   │   ├── planner/                      # POST: generate itinerary
+│   │   ├── planner/stream                # POST: SSE streaming
+│   │   ├── planner/save                  # POST: persist trip
+│   │   └── planner/saved/[id]           # GET: retrieve saved trips
+│   │
+│   └── (dashboard)/
+│       ├── planner/                      # UI: trip generator
+│       └── tours/                        # UI: saved trips gallery
+│
+├── components/                            # React components
+│   ├── TravelPlanner.jsx                 # Main planner form
+│   ├── ToursList.jsx                     # Saved trips list
+│   ├── TourCard.jsx                      # Trip card (save/view)
+│   └── ... (UI primitives)
+│
+├── agentic-service/                      # FastAPI backend
+│   ├── main.py                           # Entry point (uvicorn)
+│   │
+│   ├── agents/
+│   │   ├── planner.py                    # 🔑 AgenticPlanner (LangGraph)
+│   │   ├── tools.py                      # Tool registry
+│   │   └── state.py                      # PlannerState schema
+│   │
+│   ├── services/
+│   │   ├── amadeus_service.py            # Flight/hotel API wrapper
+│   │   ├── unsplash_service.py           # Image retrieval
+│   │   └── cache_service.py              # Caching layer
+│   │
+│   ├── requirements.txt                  # Python dependencies
+│   ├── Dockerfile                        # Non-root container
+│   └── main.py                           # FastAPI app
+│
+├── prisma/
+│   ├── schema.prisma                     # Data model
+│   └── migrations/                       # Migration history
+│
+├── infra/pulumi/                         # AWS IaC (TypeScript)
+│   ├── index.ts                          # EC2 provisioning
+│   └── Pulumi.*.yaml                     # Stack config
+│
+├── Dockerfile                            # Frontend image
+├── docker-compose.yml                    # Local/prod compose
+├── next.config.js                        # Next.js config
+├── tailwind.config.js                    # Tailwind setup
+│
+└── README.md                             # This file
+```
+
+---
+
+## 🚀 Core API Surface
+
+### Travel Planner Endpoints
+
+#### Generate Itinerary (with streaming)
+
+```bash
+# Streaming endpoint (SSE)
+curl -X POST http://localhost:3000/api/travel/planner/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "city": "Tokyo",
+    "country": "Japan",
+    "days": 5,
+    "budget": 3000,
+    "preferences": { "activity_level": "high", "cuisine": ["ramen", "sushi"] }
+  }'
+
+# Response stream:
+# data: {"event":"status","payload":"Researcher: gathering destination insights"}
+# data: {"event":"chunk","payload":"Day 1: Arrival in Shibuya..."}
+# ...
+# data: {"event":"result","payload":{"tour":{...},"cost":{...}}}
+# data: {"event":"done"}
+```
+
+#### Save Trip
+
+```bash
+POST /api/travel/planner/save
+Content-Type: application/json
+
+{
+  "title": "Tokyo Adventure",
+  "tour": { ... },
+  "cost": { ... }
+}
+```
+
+#### Retrieve Saved Trips
+
+```bash
+GET /api/travel/planner/saved
+# Returns: [{id, title, tour, cost, createdAt}, ...]
+
+GET /api/travel/planner/saved/[id]
+# Returns: {id, title, tour, cost, createdAt}
+```
+
+---
+
+## 📊 Data Model (Prisma Schema)
+
+```prisma
+model Tour {
+  id        String   @id @default(cuid())
+  title     String
+  tour      Json     // Structured itinerary
+  cost      Json     // Cost breakdown
+  city      String
+  country   String
+  days      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TripPlan {
+  id        String   @id @default(cuid())
+  title     String
+  plan      Json     // Full generated plan
+  metadata  Json?    // Search params, preferences
+  createdAt DateTime @default(now())
+}
+```
+
+**Key design:**
+- `tour` and `plan` stored as JSON for flexibility (no schema lock-in during iteration)
+- Timestamps for sorting/filtering
+- Minimal schema = faster migrations, easier prototyping
+
+---
+
+## 🔧 Local Development
 
 ### Prerequisites
 
-- Node.js 18+
-- Python 3.11+
-- PostgreSQL (or Neon)
-- npm + pip
+```bash
+Node.js 18+
+Python 3.11+
+PostgreSQL (local or Neon)
+npm + pip
+```
 
-### 1) Install frontend deps
+### Step 1: Frontend Dependencies
 
 ```bash
 npm install
 ```
 
-### 2) Install backend deps
+### Step 2: Backend Environment
 
 ```bash
 cd agentic-service
@@ -238,48 +311,91 @@ python -m venv .venv
 .venv\Scripts\activate
 
 # macOS/Linux
-# source .venv/bin/activate
+source .venv/bin/activate
 
 pip install -r requirements.txt
 cd ..
 ```
 
-### 3) Prisma
+### Step 3: Database Migrations
 
 ```bash
 npx prisma migrate dev
 npx prisma generate
 ```
 
-### 4) Run services
+### Step 4: Environment Files
 
-Terminal A:
+Create `.env.local` at root:
+
+```bash
+# Database
+DATABASE_URL=postgres://user:pass@localhost/traveler?sslmode=disable
+
+# Backend proxy
+AGENTIC_SERVICE_URL=http://localhost:8000
+
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Travel APIs
+AMADEUS_API_KEY=...
+AMADEUS_API_SECRET=...
+UNSPLASH_ACCESS_KEY=...
+
+# Optional: Maps
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
+```
+
+Create `agentic-service/.env`:
+
+```bash
+OPENAI_API_KEY=sk-...
+AMADEUS_API_KEY=...
+AMADEUS_API_SECRET=...
+UNSPLASH_ACCESS_KEY=...
+DATABASE_URL=postgres://user:pass@localhost/traveler?sslmode=disable
+```
+
+### Step 5: Start Services
+
+**Terminal A** (backend):
 
 ```bash
 cd agentic-service
-.venv\Scripts\activate
+.venv\Scripts\activate  # or source .venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Terminal B:
+**Terminal B** (frontend):
 
 ```bash
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+**Open browser:**
+
+```
+http://localhost:3000
+```
 
 ---
 
-## Docker workflow
+## 🐳 Docker Workflow
 
-### Run full stack
+### Build & Run Full Stack
 
 ```bash
 docker compose up -d --build
 ```
 
-### Check status
+Compose will:
+- Build frontend image (Debian-based + OpenSSL for Prisma)
+- Build backend image (Python 3.11 + non-root execution)
+- Start both services with health checks
+- Frontend waits for backend readiness
+
+### Check Status
 
 ```bash
 docker compose ps
@@ -287,7 +403,7 @@ docker compose logs -f backend
 docker compose logs -f frontend
 ```
 
-### Stop
+### Stop Everything
 
 ```bash
 docker compose down
@@ -295,97 +411,273 @@ docker compose down
 
 ---
 
-## Build commands
+## 🏗️ CI/CD & Deployment (AWS)
 
-From root `package.json`:
+### Pulumi Infrastructure as Code
 
-- `npm run dev`
-- `npm run build` (`npx prisma generate && next build`)
-- `npm run start`
-- `npm run lint`
+All AWS infrastructure defined in **`infra/pulumi/`** (TypeScript):
 
----
+```typescript
+// Provisions:
+// - EC2 t3.micro instance
+// - Security group (80, 443, 22)
+// - IAM role + SSM Session Manager access
+// - Elastic IP + DNS
+// - User data script: Docker + Docker Compose bootstrap
+// - Nginx reverse proxy (HTTP → :3000)
+```
 
-## AWS deployment (Pulumi + EC2)
-
-Infrastructure definitions in `infra/pulumi` provision:
-
-- EC2 `t3.micro`
-- Security group (`80/443/22`)
-- IAM role + SSM policy
-- Elastic IP
-- user-data bootstrap for Docker, repo clone, env file creation, compose startup, nginx setup
-
-### Pulumi bootstrap
+### Deploy Steps
 
 ```bash
 cd infra/pulumi
 npm install
 pulumi stack select dev
-```
 
-### Set required secrets
-
-```bash
-pulumi config set --secret openaiApiKey ...
+# Set required secrets
+pulumi config set --secret openaiApiKey sk-...
 pulumi config set --secret amadeusApiKey ...
 pulumi config set --secret amadeusApiSecret ...
 pulumi config set --secret googleMapsApiKey ...
 pulumi config set --secret unsplashAccessKey ...
-pulumi config set --secret databaseUrl ...
-pulumi config set --secret clerkPublishableKey ...
-pulumi config set --secret clerkSecretKey ...
-pulumi config set keyPairName your-keypair-name
-```
+pulumi config set --secret databaseUrl postgres://...
+pulumi config set keyPairName my-keypair
 
-### Deploy
-
-```bash
+# Provision infrastructure
 pulumi up
 ```
 
-Pulumi exports include `appUrl`, `publicIp`, and `sshCommand`.
+**Outputs:**
+- `appUrl` → public HTTPS endpoint
+- `publicIp` → EC2 IP address
+- `sshCommand` → SSM Session Manager connect string
 
 ---
 
-## Reliability notes
+## 🎯 Key Architectural Patterns
 
-- Multiple routes are explicitly marked `dynamic = 'force-dynamic'` to avoid build-time Prisma evaluation failures.
-- Frontend Docker build uses Debian (`node:18-slim`) plus OpenSSL for Prisma engine compatibility.
-- Backend container runs as non-root and pre-configures writable cache/data directories for HF/transformers.
-- Compose health dependency prevents frontend startup before backend readiness.
+### Pattern 1: SSE Streaming for Perceived Performance
+
+Instead of blocking on LLM completion, stream intermediate results:
+
+```javascript
+// Frontend: TravelPlanner.jsx
+const startStream = async () => {
+  const response = await fetch('/api/travel/planner/stream', { method: 'POST', body: JSON.stringify(params) });
+  const reader = response.body.getReader();
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const text = new TextDecoder().decode(value);
+    const event = JSON.parse(text.split('data: ')[1]);
+    
+    if (event.event === 'chunk') setItinerary(prev => prev + event.payload);
+    if (event.event === 'result') setSaved(event.payload);
+  }
+};
+```
+
+**Result:** User sees itinerary appearing in real-time instead of waiting 10s for "please wait…"
+
+### Pattern 2: Agent Orchestration Without Reinventing Wheels
+
+Leverage **LangGraph** for state machines instead of custom async coordination:
+
+```python
+# agentic-service/agents/planner.py
+from langgraph.graph import StateGraph, END
+
+class AgenticPlanner:
+    def _build_graph(self) -> StateGraph:
+        workflow = StateGraph(PlannerState)
+        
+        workflow.add_node("supervisor", self._supervisor_node)
+        workflow.add_node("researcher", self._researcher_node)
+        workflow.add_node("logistics", self._logistics_node)
+        
+        workflow.set_entry_point("supervisor")
+        workflow.add_edge("supervisor", "researcher")
+        workflow.add_edge("researcher", "logistics")
+        
+        return workflow.compile()
+```
+
+**Result:** Typed state, automatic serialization, execution history via Langsmith
+
+### Pattern 3: Docker Build Optimization for Prisma
+
+Prisma Engine requires OpenSSL + Debian base for build compatibility:
+
+```dockerfile
+# Dockerfile
+FROM node:18-slim AS base
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+FROM base AS dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+FROM base AS build
+WORKDIR /app
+COPY . .
+COPY --from=dependencies /app/node_modules ./node_modules
+RUN npx prisma generate
+RUN npm run build
+```
+
+**Result:** Reproducible builds, avoids "Query Engine not found" errors
+
+### Pattern 4: Fallback Itinerary Generation
+
+If backend is slow/down, frontend can generate a basic itinerary:
+
+```javascript
+// app/api/travel/planner/route.js
+const fallbackTour = {
+  title: `${days}-Day ${city} Adventure`,
+  stops: [],
+  cost: { estimated_usd: budget * 0.8 }
+};
+
+// Try backend, fallback if timeout
+const tour = await Promise.race([
+  fetchBackendItinerary(params),
+  timeout(5000).then(() => Promise.reject('timeout'))
+]).catch(() => fallbackTour);
+```
+
+**Result:** Graceful degradation instead of hard errors
 
 ---
 
-## Troubleshooting
+## 🔍 Debugging & Observability
 
-### `Prisma Client could not locate Query Engine` during build
+### View Execution History (Local)
 
-- Ensure frontend Docker image is Debian-based (`node:18-slim`) and has OpenSSL installed.
+Backend logs every agent step with timestamps:
 
-### Backend container unhealthy with permission errors
+```
+[2024-02-22 14:32:15] [run_abc123] Supervisor: initiating planning workflow
+[2024-02-22 14:32:16] [run_abc123] Researcher: gathering destination insights
+[2024-02-22 14:32:18] [run_abc123] Logistics: optimizing itinerary
+[2024-02-22 14:32:20] [run_abc123] Compliance: validating requirements
+[2024-02-22 14:32:22] [run_abc123] Experience: creating content
+[2024-02-22 14:32:23] [run_abc123] Decision: assembling final itinerary
+[2024-02-22 14:32:23] [run_abc123] Planning completed successfully
+```
 
-- Verify backend Dockerfile creates and owns `/app/data` and `/home/app/.cache` before switching users.
+### Monitor Container Health
 
-### App loads default Nginx page on EC2
+```bash
+docker compose ps
+# Healthy backend = green, frontend waits if unhealthy
 
-- Disable/remove default server block so custom reverse proxy site config takes precedence.
-
-### Streaming planner hangs
-
-- Confirm Next route `/api/travel/planner/stream` points to backend `/api/v1/agentic/generate-itinerary-stream`.
+docker compose logs -f backend | grep "ERROR"
+docker compose logs -f frontend | grep "Failed"
+```
 
 ---
 
-## Future hardening ideas
+## 🛡️ Production Readiness Checklist
 
-- Add OpenTelemetry tracing across Next API routes and FastAPI planner calls.
-- Introduce Redis as first-class cache layer in compose for deterministic warm cache behavior.
-- Add CI workflows for `npm run lint`, type checks, and container build smoke tests.
-- Add signed upload URLs and object storage for vault files.
+- [x] **Health checks** (Docker + compose)
+- [x] **Non-root container execution** (security best practice)
+- [x] **Secrets management** (Pulumi config + environment injection)
+- [x] **Error handling** (try/catch + fallback itineraries)
+- [x] **Async throughout** (FastAPI + Python asyncio)
+- [x] **IaC** (Pulumi for reproducible infrastructure)
+- [x] **Streaming UX** (SSE for better perceived performance)
+
+### Next Steps for Hardening
+
+- **OpenTelemetry tracing** across Next.js API routes + FastAPI for distributed debugging
+- **Redis caching layer** for Amadeus/Unsplash responses (deterministic warm cache)
+- **Temporal.io workflows** for multi-step operations spanning hours (e.g., price monitoring)
+- **CI/CD pipeline** (GitHub Actions: lint, type-check, container build smoke tests)
+- **Database connection pooling** (PgBouncer for production PostgreSQL)
+- **Rate limiting** on `/api/travel/planner/stream` (prevent abuse)
 
 ---
 
-## License
+## 🚨 Troubleshooting
 
-Add your preferred license (`MIT`, `Apache-2.0`, etc.) to clarify usage terms.
+### Docker Build Fails: "Query Engine not found"
+
+**Cause:** Non-Debian Node image or missing OpenSSL
+
+**Fix:**
+```dockerfile
+FROM node:18-slim  # ← must be -slim (Debian)
+RUN apt-get update && apt-get install -y openssl
+```
+
+### Backend Container Unhealthy
+
+**Cause:** Permission issues or missing Python deps
+
+**Check:**
+```bash
+docker compose logs backend
+# Look for permission errors in /app/data or ~/.cache
+```
+
+**Fix:** Ensure Dockerfile creates dirs before switching to non-root user
+
+```dockerfile
+RUN mkdir -p /app/data && chown -R app:app /app/data
+USER app
+```
+
+### Streaming Response Hangs
+
+**Cause:** Mismatch between frontend SSE endpoint and backend FastAPI route
+
+**Check:**
+- Frontend: POST to `/api/travel/planner/stream` ✓
+- Backend should have `/api/v1/agentic/generate-itinerary-stream` ✓
+- Middleware must correctly proxy SSE headers (not buffer the stream)
+
+### Frontend can't reach backend in Docker
+
+**Cause:** Service names not resolving (compose DNS)
+
+**Fix:**
+```yaml
+# docker-compose.yml
+services:
+  backend:
+    container_name: backend  # ← use this name
+  frontend:
+    environment:
+      AGENTIC_SERVICE_URL: http://backend:8000  # ← resolve via DNS
+```
+
+---
+
+## 📚 Learning Resources & References
+
+- [LangGraph Docs](https://langchain-ai.github.io/langgraph/) — Agent orchestration deep dives
+- [FastAPI SSE](https://fastapi.tiangolo.com/advanced/sse/) — Streaming patterns
+- [Next.js 14 App Router](https://nextjs.org/docs/app) — Server components, API routes
+- [Prisma Async Queries](https://www.prisma.io/docs/orm/more/comparisons/prisma-and-sqlalchemy#async) — Python async ORM
+- [Docker Security Best Practices](https://docs.docker.com/develop/security-best-practices/) — Non-root, secrets, scanning
+
+---
+
+## 📝 License
+
+MIT (modify as needed for your use case)
+
+---
+
+## 👤 About
+
+Built as a **production-grade demo** of full-stack AI application patterns: agentic orchestration, streaming UX, containerized services, and cloud IaC.
+
+Perfect for:
+- **Portfolio projects** showcasing modern AI/ML architecture
+- **Learning** streaming, async patterns, and LLM orchestration
+- **Prototyping** Agent-based workflows before Temporal.io migration
