@@ -15,8 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN addgroup --system app && adduser --system --ingroup app app
+# Create non-root user and data directory
+RUN addgroup --system app && adduser --system --ingroup app app && \
+    mkdir -p /app/data && chown -R app:app /app/data
 USER app
 
 EXPOSE 8000
