@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteKnowledgeDocument } from "@/utils/actions";
 import prisma from "@/utils/db";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function DELETE(request, { params }) {
   const userId = "guest";
@@ -18,7 +18,7 @@ export async function DELETE(request, { params }) {
     if (!document) {
       return NextResponse.json(
         { error: "Document not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -40,7 +40,7 @@ export async function DELETE(request, { params }) {
     console.error("Error deleting document:", error);
     return NextResponse.json(
       { error: "Failed to delete document" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

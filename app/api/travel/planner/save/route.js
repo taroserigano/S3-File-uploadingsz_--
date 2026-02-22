@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request) {
     if (!destination || !itinerary) {
       return NextResponse.json(
         { error: "Missing required fields: destination and itinerary" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -58,7 +58,7 @@ export async function POST(request) {
     console.error("Error saving trip plan:", error);
     return NextResponse.json(
       { error: "Failed to save trip plan" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const VAULT_API_URL = process.env.VAULT_API_URL;
 
@@ -13,15 +13,13 @@ async function forwardToVaultService({
   notes,
 }) {
   if (!VAULT_API_URL) {
-    throw new Error(
-      "VAULT_API_URL environment variable is not configured."
-    );
+    throw new Error("VAULT_API_URL environment variable is not configured.");
   }
 
   // Convert file to base64
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
-  const base64File = buffer.toString('base64');
+  const base64File = buffer.toString("base64");
 
   // Send as JSON instead of multipart
   const response = await fetch(`${VAULT_API_URL}/vault/upload`, {
@@ -48,7 +46,9 @@ async function forwardToVaultService({
     payload = JSON.parse(responseText);
   } catch (e) {
     console.error("[VAULT UPLOAD] Failed to parse response:", responseText);
-    throw new Error(`Invalid response from vault service: ${responseText.substring(0, 100)}`);
+    throw new Error(
+      `Invalid response from vault service: ${responseText.substring(0, 100)}`,
+    );
   }
 
   if (!response.ok) {
@@ -63,7 +63,7 @@ async function forwardToVaultService({
 export async function POST(request) {
   const userId = "guest";
   console.log("[VAULT UPLOAD] Using guest user");
-  
+
   if (!userId) {
     console.log("[VAULT UPLOAD] Auth failed - no userId");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -108,12 +108,12 @@ export async function POST(request) {
       chunkCount: ingestionResult.chunkCount ?? 0,
       tokenEstimate: ingestionResult.tokenEstimate ?? 0,
     };
-    
+
     // Add filePath if provided by backend
     if (ingestionResult.filePath) {
       updateData.filePath = ingestionResult.filePath;
     }
-    
+
     const updated = await prisma.knowledgeDocument.update({
       where: { id: documentRecord.id },
       data: updateData,
@@ -121,17 +121,17 @@ export async function POST(request) {
 
     return NextResponse.json(
       { document: updated, message: ingestionResult.message },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("[VAULT UPLOAD] Error:", error);
     console.error("[VAULT UPLOAD] Error message:", error?.message);
     console.error("[VAULT UPLOAD] Error cause:", error?.cause);
-    
+
     const detail = error?.message?.includes("fetch failed")
       ? `Vault ingestion service is unreachable at ${VAULT_API_URL}.`
       : error?.message || "Unknown error";
-    
+
     await prisma.knowledgeDocument.update({
       where: { id: documentRecord.id },
       data: {
@@ -142,7 +142,7 @@ export async function POST(request) {
 
     return NextResponse.json(
       { error: "Upload failed", detail, fullError: error?.toString() },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

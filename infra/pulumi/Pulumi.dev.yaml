@@ -17,3 +17,4 @@ config:
     secure: v1:4lDLHGzK+DQwwz/c:cVG/CTEmd4fJbseir7RAZa2Pu8ku9C0y9hGJWAnfqyva/bR8n63f23YTTnjJznd1NLmIASKk+qeYhIKytW8P0OV92/3T9brd7A0+FTgN
   travel-app:clerkSecretKey:
     secure: v1:/G1fsnEtJR2SiHKV:DjHa+7Cdaa1ZI8H4cx+opiO/SEDeOP/NtQ/lXyAh77ZzVkcPEeyCZ+CO5PyATNmd17oSsOya/JWVZ9v+FhD/zWJu
+  travel-app:keyPairName: travel-app-debug

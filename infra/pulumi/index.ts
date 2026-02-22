@@ -103,26 +103,26 @@ const userData = pulumi
     ]) => {
       // Build the script, then strip any \r so CRLF from Windows doesn't break #!/bin/bash
       const script = `#!/bin/bash
-set -euo pipefail
 exec > /var/log/user-data.log 2>&1
+set -x
+echo "=== START user-data at $(date) ==="
 
-echo "=== Creating 2 GB swap (t3.micro has only 1 GB RAM) ==="
+echo "=== Creating 2 GB swap ==="
 dd if=/dev/zero of=/swapfile bs=1M count=2048
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
+chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
 echo "=== Installing Docker ==="
-yum update -y
-yum install -y docker git
-systemctl enable docker && systemctl start docker
+dnf install -y docker git || yum install -y docker git
+systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
 
 echo "=== Installing Docker Compose v2 ==="
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -sSL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version
 
 echo "=== Cloning repo ==="
 cd /home/ec2-user
@@ -130,7 +130,7 @@ git clone https://github.com/taroserigano/S3-File-uploadingsz_--.git app
 cd app
 
 echo "=== Writing backend .env ==="
-cat > agentic-service/.env << 'ENVEOF'
+cat > agentic-service/.env <<'ENVEOF'
 OPENAI_API_KEY=${openai}
 AMADEUS_API_KEY=${amadeus}
 AMADEUS_API_SECRET=${amadeusSecret}
@@ -139,7 +139,7 @@ UNSPLASH_ACCESS_KEY=${unsplash}
 ENVEOF
 
 echo "=== Writing frontend .env.local ==="
-cat > .env.local << 'ENVEOF'
+cat > .env.local <<'ENVEOF'
 DATABASE_URL=${dbUrl}
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerkPub}
 CLERK_SECRET_KEY=${clerkSec}
@@ -149,23 +149,24 @@ ENVEOF
 
 echo "=== Building & starting with Docker Compose ==="
 chown -R ec2-user:ec2-user /home/ec2-user/app
-docker compose up -d --build
+docker compose up -d --build 2>&1
 
 echo "=== Setting up Nginx reverse proxy (port 80 -> 3000) ==="
-yum install -y nginx
-cat > /etc/nginx/conf.d/travel-app.conf << 'NGINXEOF'
+dnf install -y nginx || yum install -y nginx
+
+cat > /etc/nginx/conf.d/travel-app.conf <<'NGINXEOF'
 server {
     listen 80;
     server_name _;
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 300s;
@@ -174,9 +175,12 @@ server {
 NGINXEOF
 
 rm -f /etc/nginx/conf.d/default.conf
-systemctl enable nginx && systemctl start nginx
+systemctl enable nginx
+systemctl start nginx
 
-echo "=== Done ==="
+echo "=== Docker status ==="
+docker ps
+echo "=== DONE user-data at $(date) ==="
 `;
       return script.replace(/\r/g, "");
     },

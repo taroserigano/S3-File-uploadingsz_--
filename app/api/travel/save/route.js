@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   const userId = "guest";
@@ -13,7 +13,7 @@ export async function POST(request) {
     if (!itinerary || !itinerary.tour) {
       return NextResponse.json(
         { error: "Invalid itinerary data" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,10 +50,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Error saving trip:", error);
-    return NextResponse.json(
-      { error: "Failed to save trip" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save trip" }, { status: 500 });
   }
 }
-

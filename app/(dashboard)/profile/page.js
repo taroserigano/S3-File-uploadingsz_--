@@ -1,16 +1,16 @@
-import { fetchUserTokensById } from '@/utils/actions';
+import { fetchUserTokensById } from "@/utils/actions";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const ProfilePage = async () => {
-  const userId = 'guest';
+  const userId = "guest";
   const currentTokens = await fetchUserTokensById(userId);
   return (
     <div>
-      <h2 className='mb-8 ml-8 text-xl font-extrabold'>
+      <h2 className="mb-8 ml-8 text-xl font-extrabold">
         Token Amount : {currentTokens}
       </h2>
-      <div className='px-8'>
+      <div className="px-8">
         <p>Guest User Profile</p>
       </div>
     </div>

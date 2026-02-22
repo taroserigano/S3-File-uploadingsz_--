@@ -1,19 +1,19 @@
-import ToursPage from '@/components/ToursPage';
-import { getAllTours } from '@/utils/actions';
+import ToursPage from "@/components/ToursPage";
+import { getAllTours } from "@/utils/actions";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import {
   dehydrate,
   HydrationBoundary,
   QueryClient,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
 const AllToursPage = async () => {
   const queryClient = new QueryClient();
 
   await queryClient.prefetchQuery({
-    queryKey: ['tours', ''],
+    queryKey: ["tours", ""],
     queryFn: () => getAllTours(),
   });
   return (
