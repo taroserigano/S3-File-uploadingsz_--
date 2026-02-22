@@ -1,5 +1,8 @@
 import ToursPage from '@/components/ToursPage';
 import { getAllTours } from '@/utils/actions';
+
+export const dynamic = 'force-dynamic';
+
 import {
   dehydrate,
   HydrationBoundary,

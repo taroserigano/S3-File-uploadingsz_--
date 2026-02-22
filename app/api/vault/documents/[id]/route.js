@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { deleteKnowledgeDocument } from "@/utils/actions";
 import prisma from "@/utils/db";
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(request, { params }) {
   const userId = "guest";
 

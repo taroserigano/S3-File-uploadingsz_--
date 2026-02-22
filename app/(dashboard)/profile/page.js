@@ -1,5 +1,7 @@
 import { fetchUserTokensById } from '@/utils/actions';
 
+export const dynamic = 'force-dynamic';
+
 const ProfilePage = async () => {
   const userId = 'guest';
   const currentTokens = await fetchUserTokensById(userId);

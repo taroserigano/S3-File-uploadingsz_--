@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
+export const dynamic = 'force-dynamic';
+
 const VAULT_API_URL = process.env.VAULT_API_URL;
 
 export async function GET(request, { params }) {

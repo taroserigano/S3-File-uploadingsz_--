@@ -1,5 +1,6 @@
 # ── Frontend (Next.js) ───────────────────────────────────────
-FROM node:18-alpine AS base
+FROM node:18-slim AS base
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # 1️⃣ Install dependencies
 FROM base AS deps
@@ -28,8 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser  --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd  --system --uid 1001 nextjs
 
 # Copy built assets (.next-dev is the configured distDir)
 COPY --from=builder /app/public ./public

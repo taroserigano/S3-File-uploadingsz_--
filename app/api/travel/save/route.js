@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/utils/db";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   const userId = "guest";
 
