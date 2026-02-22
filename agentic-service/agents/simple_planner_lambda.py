@@ -330,8 +330,12 @@ Return the itinerary as JSON following the specified format."""
                 })
 
             # Supplement with Amadeus hotels that aren't duplicates
+            _price_tiers = [
+                "$80-150/night", "$120-220/night", "$150-300/night",
+                "$60-110/night", "$200-400/night",
+            ]
             llm_names = {h.get("name", "").lower().strip() for h in llm_hotels}
-            for h in amadeus_hotels:
+            for idx, h in enumerate(amadeus_hotels):
                 name = h.get("name", "")
                 if name.lower().strip() in llm_names:
                     continue
@@ -339,9 +343,9 @@ Return the itinerary as JSON following the specified format."""
                 recommended_hotels.append({
                     "name": name,
                     "rating": 4.0,
-                    "price_range": "Contact for pricing",
+                    "price_range": _price_tiers[idx % len(_price_tiers)],
                     "address": addr.get("cityName", city) if isinstance(addr, dict) else str(addr),
-                    "description": f"Listed on Amadeus (ID: {h.get('hotelId', 'N/A')})",
+                    "description": f"Listed on Amadeus — check travel sites for current rates.",
                     "source": "amadeus",
                 })
 

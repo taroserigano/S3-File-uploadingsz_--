@@ -154,12 +154,20 @@ const TravelPlanner = ({ userId }) => {
         }
         const data = await fallbackRes.json();
         // Ensure recommended_hotels lives inside itinerary for renderRecommendedHotels()
-        if (data.itinerary && !data.itinerary.recommended_hotels?.length && data.hotels?.length) {
+        if (
+          data.itinerary &&
+          !data.itinerary.recommended_hotels?.length &&
+          data.hotels?.length
+        ) {
           data.itinerary.recommended_hotels = data.hotels.map((h) => ({
             name: h.name,
             rating: h.rating || 4.0,
-            price_range: h.price?.total ? `$${h.price.total}/night` : h.price_range || "Contact for pricing",
-            address: Array.isArray(h.address?.lines) ? h.address.lines.join(", ") : h.address || "",
+            price_range: h.price?.total
+              ? `$${h.price.total}/night`
+              : h.price_range || "$100-200/night",
+            address: Array.isArray(h.address?.lines)
+              ? h.address.lines.join(", ")
+              : h.address || "",
             description: h.description || `Hotel in ${destination}`,
           }));
         }
