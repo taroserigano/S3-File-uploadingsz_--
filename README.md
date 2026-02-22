@@ -754,8 +754,7 @@ services:
 
 ## 📝 License
 
-MIT (modify as needed for your use case)
-
+MIT 
 ---
 
 ## 👤 About
