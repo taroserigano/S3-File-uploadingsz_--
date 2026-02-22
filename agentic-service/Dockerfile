@@ -17,7 +17,13 @@ COPY . .
 
 # Create non-root user and data directory
 RUN addgroup --system app && adduser --system --ingroup app app && \
-    mkdir -p /app/data && chown -R app:app /app/data
+    mkdir -p /app/data /home/app/.cache && \
+    chown -R app:app /app/data /home/app
+
+ENV HOME=/home/app
+ENV HF_HOME=/home/app/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/home/app/.cache/huggingface
+
 USER app
 
 EXPOSE 8000
