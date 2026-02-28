@@ -1,8 +1,23 @@
 # Agentic AI Travel Planner
 
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Production-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![OpenAI](https://img.shields.io/badge/LLM-OpenAI-412991?logo=openai)](https://platform.openai.com/docs)
+[![Docker](https://img.shields.io/badge/Containerized-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Pulumi](https://img.shields.io/badge/IaC-Pulumi-8A3391?logo=pulumi)](https://www.pulumi.com/)
+[![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?logo=amazon-aws)](https://aws.amazon.com/)
+
 Production-ready, full-stack AI travel platform built with **Next.js 14 + FastAPI + OpenAI + AWS + Pulumi**.
 
 This project is designed to demonstrate senior-level engineering across product UX, AI orchestration, reliability, and cloud deployment.
+
+## 1-minute recruiter skim
+
+- **What it is**: an agentic AI travel platform that generates rich itineraries in real time via SSE streaming.
+- **Why it matters**: demonstrates practical delivery of AI products beyond demos—latency handling, fallback behavior, and production deployment.
+- **What I built**: Next.js frontend, FastAPI AI service, API integration layer (OpenAI + Amadeus + Unsplash), persistence, and AWS IaC.
+- **Engineering depth**: streaming pipelines, async orchestration, structured response normalization, Dockerized services, CloudFront + EC2 deployment.
+- **Hiring signal**: strong end-to-end ownership from product UX to backend performance tuning and cloud operations.
 
 ## Why this project is strong for employers
 
