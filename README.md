@@ -17,8 +17,10 @@
 ### 💎 **Hyper-Personalization at Scale**
 
 - **Preferences as first-class citizen**: Not "pick from 10 presets" but "enter your exact priorities" → AI adapts
-### Real-world constraints**: Automatically handles hotel availability, weather patterns, local holidays, budget optimization
-### Cost transparency**: Every itinerary breaks down hotel costs, activity prices, food budget — no surprises, all transparent
+
+### Real-world constraints\*\*: Automatically handles hotel availability, weather patterns, local holidays, budget optimization
+
+### Cost transparency\*\*: Every itinerary breaks down hotel costs, activity prices, food budget — no surprises, all transparent
 
 ### 🏆 **Enterprise-Grade Reliability**
 
@@ -789,20 +791,24 @@ services:
 ### Hotel Recommendations Pipeline
 
 ✅ **Fixed:** Hotel recommendations not displaying in the UI
+
 - Root cause: Data shape mismatch between backend response and frontend expectations
 - Solution: Restructured API to embed `recommended_hotels` inside `itinerary` object
 - Paths fixed: Backend fallback generation, non-streaming route, and streaming SSE path
 
 ✅ **Fixed:** All hotels showing "Contact for pricing"
+
 - Root cause: Amadeus hotels appeared only when LLM JSON was truncated before `recommended_hotels` field
 - Solution: Replaced hardcoded prices with rotating price tiers ($60-110/night, $80-150/night, etc.)
 
 ✅ **Tested:** Comprehensive test suite
+
 - 33 Python tests covering hotel pipeline, city code resolution, price tier rotation, JSON repair
 - 18 JavaScript tests covering API routes, frontend merge logic, fallback generation
 - All tests passing with 100% coverage on hotel recommendation paths
 
 ✅ **Infrastructure:** Updated Pulumi EC2 deployment
+
 - Latest code deployed and running on AWS (commit `7da6e19`)
 - Passphrase recovered (was empty string), secrets properly stored
 

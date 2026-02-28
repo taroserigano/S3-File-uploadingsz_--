@@ -519,12 +519,24 @@ class SimplePlanner:
 
         yield f"event: status\ndata: {_json.dumps({'phase': 'generating_itinerary'})}\n\n"
 
-        # Stream LLM chunks
+        # Stream LLM chunks — batch every ~20 tokens to cut SSE overhead 20×
+        # (reduces ~1500 events → ~75, fewer json.dumps / network frames / React re-renders)
         accumulated = ""
+        _chunk_buf = ""
+        _chunk_n = 0
+        _BATCH_SIZE = 20
         try:
             async for chunk_text in self._call_llm_stream(city, country, days, budget_str, pref_str):
                 accumulated += chunk_text
-                yield f"event: chunk\ndata: {_json.dumps({'text': chunk_text})}\n\n"
+                _chunk_buf += chunk_text
+                _chunk_n += 1
+                if _chunk_n >= _BATCH_SIZE:
+                    yield f"event: chunk\ndata: {_json.dumps({'text': _chunk_buf})}\n\n"
+                    _chunk_buf = ""
+                    _chunk_n = 0
+            # Flush remaining buffer
+            if _chunk_buf:
+                yield f"event: chunk\ndata: {_json.dumps({'text': _chunk_buf})}\n\n"
         except Exception as exc:
             yield f"event: error\ndata: {_json.dumps({'error': str(exc)})}\n\n"
             return

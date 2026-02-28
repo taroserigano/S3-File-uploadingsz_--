@@ -122,6 +122,7 @@ const TravelPlanner = ({ userId }) => {
     abortRef.current = controller;
 
     try {
+      // Use SSE streaming endpoint for real-time progress
       const response = await fetch("/api/travel/planner/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +137,63 @@ const TravelPlanner = ({ userId }) => {
       });
 
       if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to generate trip plan");
+      }
+
+      // Parse SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let resultData = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages (separated by double newline)
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop(); // keep incomplete message in buffer
+
+        for (const msg of messages) {
+          if (!msg.trim()) continue;
+          let eventType = "message";
+          let dataStr = "";
+          for (const line of msg.split("\n")) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            else if (line.startsWith("data: ")) dataStr = line.slice(6);
+          }
+          if (!dataStr) continue;
+
+          try {
+            const payload = JSON.parse(dataStr);
+
+            if (eventType === "status" && payload.phase) {
+              setStreamPhase(payload.phase);
+            } else if (eventType === "chunk" && payload.text) {
+              setStreamChunks((prev) => prev + payload.text);
+            } else if (eventType === "result") {
+              resultData = payload;
+            } else if (eventType === "error") {
+              throw new Error(
+                payload.error || "Backend error during generation",
+              );
+            }
+            // "done" event — just let the loop finish
+          } catch (parseErr) {
+            // Ignore JSON parse errors for partial data
+            if (parseErr.message && !parseErr.message.includes("JSON"))
+              throw parseErr;
+          }
+        }
+      }
+
+      // Build the tripData from the SSE result
+      if (!resultData || resultData.status === "failed") {
         // Fall back to non-streaming endpoint
+        setStreamPhase("generating_itinerary");
+        setStreamChunks("");
         const fallbackRes = await fetch("/api/travel/planner", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -148,18 +205,60 @@ const TravelPlanner = ({ userId }) => {
             preferences,
           }),
         });
-        if (!fallbackRes.ok) {
-          const errData = await fallbackRes.json();
-          throw new Error(errData.error || "Failed to generate trip plan");
+        if (!fallbackRes.ok) throw new Error("Failed to generate trip plan");
+        resultData = await fallbackRes.json();
+        setTripData(resultData);
+      } else {
+        // Transform backend result to match frontend shape
+        const tour = resultData.tour || resultData;
+
+        // Normalize daily_plans: map plan[]→activities[], activity→name, notes→description
+        if (tour.daily_plans) {
+          tour.daily_plans = tour.daily_plans.map((day) => ({
+            ...day,
+            title: day.theme || day.title,
+            activities: (day.plan || day.activities || []).map((a) => ({
+              time: a.time,
+              name: a.activity || a.name,
+              description: a.notes || a.description,
+              location:
+                typeof a.location === "string"
+                  ? { address: a.location, type: "location" }
+                  : a.location,
+              duration: a.duration,
+              estimated_cost: a.estimated_cost,
+            })),
+          }));
+        } else if (tour.daily_schedule) {
+          tour.daily_plans = tour.daily_schedule.map((day) => ({
+            ...day,
+            title: day.theme || day.title,
+            activities: (day.activities || []).map((a) => ({
+              time: a.time,
+              name: a.activity || a.name,
+              description: a.notes || a.description,
+              location:
+                typeof a.location === "string"
+                  ? { address: a.location, type: "location" }
+                  : a.location,
+              duration: a.duration,
+              estimated_cost: a.estimated_cost,
+            })),
+          }));
         }
-        const data = await fallbackRes.json();
-        // Ensure recommended_hotels lives inside itinerary for renderRecommendedHotels()
+
+        const data = {
+          itinerary: tour,
+          run_id: resultData.run_id,
+          cost: resultData.cost,
+        };
+        // Ensure recommended_hotels lives inside itinerary
         if (
           data.itinerary &&
           !data.itinerary.recommended_hotels?.length &&
-          data.hotels?.length
+          resultData.hotels?.length
         ) {
-          data.itinerary.recommended_hotels = data.hotels.map((h) => ({
+          data.itinerary.recommended_hotels = resultData.hotels.map((h) => ({
             name: h.name,
             rating: h.rating || 4.0,
             price_range: h.price?.total
@@ -172,114 +271,14 @@ const TravelPlanner = ({ userId }) => {
           }));
         }
         setTripData(data);
-        toast.success("Trip plan generated!");
-        return;
       }
-
-      // Read SSE stream
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop(); // keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            const eventType = line.slice(7).trim();
-            // Next line should be data
-            continue;
-          }
-          if (line.startsWith("data: ")) {
-            const dataStr = line.slice(6);
-            try {
-              const data = JSON.parse(dataStr);
-
-              // Determine event type from the last seen event line
-              if (data.phase) {
-                setStreamPhase(data.phase);
-                if (data.phase === "cache_hit") {
-                  setStreamPhase("complete");
-                }
-              } else if (data.text !== undefined) {
-                setStreamChunks((prev) => prev + data.text);
-              } else if (data.tour) {
-                // Final result
-                // Transform for TravelPlanner expected format
-                const tour = data.tour;
-                if (tour.daily_plans) {
-                  tour.daily_plans = tour.daily_plans.map((day) => ({
-                    ...day,
-                    title: day.theme || day.title,
-                    activities: (day.plan || day.activities || []).map(
-                      (activity) => ({
-                        time: activity.time,
-                        name: activity.activity || activity.name,
-                        description: activity.notes || activity.description,
-                        location:
-                          typeof activity.location === "string"
-                            ? { address: activity.location, type: "location" }
-                            : activity.location,
-                        duration: activity.duration,
-                        estimated_duration: activity.duration,
-                      }),
-                    ),
-                  }));
-                }
-                // Ensure recommended_hotels fallback for streaming path
-                if (!tour.recommended_hotels?.length) {
-                  tour.recommended_hotels = [
-                    {
-                      name: `Grand ${destination} Hotel`,
-                      rating: 4.5,
-                      price_range: "$150-250/night",
-                      address: `City Center, ${destination}`,
-                      description: `Luxury hotel in the heart of ${destination} with excellent amenities.`,
-                    },
-                    {
-                      name: `${destination} Budget Inn`,
-                      rating: 3.8,
-                      price_range: "$60-100/night",
-                      address: `Downtown ${destination}`,
-                      description: `Affordable accommodation near public transport and dining.`,
-                    },
-                    {
-                      name: `Boutique ${destination} Suites`,
-                      rating: 4.2,
-                      price_range: "$120-180/night",
-                      address: `${destination} Arts District`,
-                      description: `Charming boutique hotel with unique decor and personalized service.`,
-                    },
-                  ];
-                }
-                setTripData({
-                  itinerary: tour,
-                  run_id: data.run_id,
-                  cost: data.cost,
-                  metadata: { destination, country, days, budget, preferences },
-                });
-                setActiveDay(0);
-                setStreamPhase("complete");
-                toast.success("Trip plan generated!");
-              } else if (data.error) {
-                throw new Error(data.error);
-              }
-            } catch (parseErr) {
-              // Skip unparseable lines
-            }
-          }
-        }
-      }
+      setStreamPhase("complete");
+      toast.success("Trip plan generated!");
     } catch (err) {
       if (err.name === "AbortError") return;
       console.error("Error generating trip:", err);
-      setError(err.message);
-      toast.error(err.message);
+      setError(err.message || "Failed to generate trip plan");
+      toast.error(err.message || "Failed to generate trip plan");
     } finally {
       setIsLoading(false);
       abortRef.current = null;

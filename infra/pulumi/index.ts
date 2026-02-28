@@ -145,6 +145,11 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerkPub}
 CLERK_SECRET_KEY=${clerkSec}
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${gmaps}
 AGENTIC_SERVICE_URL=http://backend:8000
+VAULT_API_URL=https://2avgmrr36j.execute-api.us-east-1.amazonaws.com/dev
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/planner
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/planner
 ENVEOF
 
 echo "=== Building & starting with Docker Compose ==="
@@ -158,6 +163,11 @@ cat > /etc/nginx/conf.d/travel-app.conf <<'NGINXEOF'
 server {
     listen 80;
     server_name _;
+
+    # Trust CloudFront's forwarded headers
+    real_ip_header X-Forwarded-For;
+    set_real_ip_from 0.0.0.0/0;
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -166,7 +176,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 300s;
@@ -205,7 +215,7 @@ const instance = new aws.ec2.Instance("travel-app", {
   keyName: keyPairName,
   userData: userData,
   rootBlockDevice: {
-    volumeSize: 20, // 20 GB gp3 (free tier includes 30 GB)
+    volumeSize: 30, // 30 GB gp3 (free tier includes 30 GB)
     volumeType: "gp3",
   },
   tags: { Name: "travel-app" },
@@ -217,8 +227,75 @@ const eip = new aws.ec2.Eip("travel-app-eip", {
   tags: { Name: "travel-app" },
 });
 
+// ── CloudFront Distribution (free HTTPS via *.cloudfront.net cert) ─────────
+const cloudfront = new aws.cloudfront.Distribution("travel-app-cdn", {
+  enabled: true,
+  comment: "HTTPS termination for travel-app EC2",
+
+  // Origin: the EC2 Elastic IP over HTTP
+  origins: [
+    {
+      domainName: eip.publicDns, // e.g. ec2-1-2-3-4.compute-1.amazonaws.com
+      originId: "ec2Origin",
+      customOriginConfig: {
+        httpPort: 80,
+        httpsPort: 443,
+        originProtocolPolicy: "http-only", // EC2 only serves HTTP
+        originSslProtocols: ["TLSv1.2"],
+      },
+    },
+  ],
+
+  defaultCacheBehavior: {
+    targetOriginId: "ec2Origin",
+    viewerProtocolPolicy: "redirect-to-https", // Force HTTPS for visitors
+
+    allowedMethods: [
+      "DELETE",
+      "GET",
+      "HEAD",
+      "OPTIONS",
+      "PATCH",
+      "POST",
+      "PUT",
+    ],
+    cachedMethods: ["GET", "HEAD"],
+
+    // Forward everything – this is a dynamic Next.js app, not a static site
+    forwardedValues: {
+      queryString: true,
+      headers: ["*"], // Forward all headers so Next.js SSR works
+      cookies: { forward: "all" },
+    },
+
+    minTtl: 0,
+    defaultTtl: 0,
+    maxTtl: 0, // No caching – let Next.js control Cache-Control
+    compress: true, // Gzip/Brotli for free
+  },
+
+  // Use the default CloudFront certificate (*.cloudfront.net)
+  viewerCertificate: {
+    cloudfrontDefaultCertificate: true,
+  },
+
+  restrictions: {
+    geoRestriction: {
+      restrictionType: "none",
+    },
+  },
+
+  // Next.js returns its own 404/500 pages
+  priceClass: "PriceClass_100", // US + Europe edges (cheapest)
+
+  tags: { Name: "travel-app-cdn" },
+});
+
 // ── Stack outputs ──────────────────────────────────────────────────────────
 export const publicIp = eip.publicIp;
 export const publicDns = eip.publicDns;
-export const appUrl = pulumi.interpolate`http://${eip.publicIp}`;
+export const appUrl = pulumi.interpolate`https://${cloudfront.domainName}`;
+export const cloudfrontDomain = cloudfront.domainName;
+export const cloudfrontDistributionId = cloudfront.id;
+export const directHttpUrl = pulumi.interpolate`http://${eip.publicIp}`;
 export const sshCommand = pulumi.interpolate`ssh -i ~/.ssh/${keyPairName || "your-key"}.pem ec2-user@${eip.publicIp}`;

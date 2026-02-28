@@ -1,20 +1,20 @@
-encryptionsalt: v1:ygPQe37/BUs=:v1:OvQRRQzbvy83roCw:+QhDGE5XUsydURISzoTS+iUklM3r/A==
 config:
   aws:region: us-east-1
-  travel-app:openaiApiKey:
-    secure: v1:5IEklj+NAjq6fhoO:wpinsBmMQuPt6HLTjsWreN1OfV4RjHth72fGmFbHtkaCOUCU2NTrMpJBwRdqZJ25u0u+iLBJ9WB9t8O3IAOanq5LemVDvV7l9oHTMjKwChRz9ZKngBd+A1zGo6AdCZ3XlazIfhBwMfJQ41bOuwu+TPaOHACU+QdbNJFlvFSVRn/TbAdqTsjjhmabh1vwAuf3u5gjYHJadYDNM67zNNmW5yHkDSC49a8x7CBWj4V9NmL6GUs+
-  travel-app:amadeusApiKey:
-    secure: v1:sE69VbgcjtHNIHT0:axLNpTGoPUD+9TzfTpXEpBpEuP9tdhcP56x8f0Z5PWMYPHzM/GPDvZYJ1PmYvyx8
-  travel-app:amadeusApiSecret:
-    secure: v1:C4jiTBp/JIpwPUIF:B9bmUa2ffHfVwxSSdgFsb6ZtYc8j/JYMISdihljnxjA=
-  travel-app:googleMapsApiKey:
-    secure: v1:Kaykn7TihS8HyVqg:Ez/7JOM1o77n8nSoFAcv2gjdqQwbiX2eWyGmSC6Ips3IZISxvKLWJfqtjdTia1x61eUHDka4iQ==
-  travel-app:unsplashAccessKey:
-    secure: v1:ob31qW8oPYDSUcmg:yLwgQjTwlHabExCAZr8+JCMqYxBtD4MZvekQI9FlOeO/N7RrBK+Ds9/FcLZpVdHugR+AqNyk6BfmvOU=
-  travel-app:databaseUrl:
-    secure: v1:SmWMbXnN9ImjznJ0:sqNot65s7BlnqDtM5jdsugDHhV0oga8vIVuADufUJeIDWMrqM76MZhfEZ6GddLT79410Tij38oZ7859d4m7P/tXK7lG1oYIrvVsspbXoWBPq8GYIOYfFOsNUq4oDxtnSIjhKGsw/I0+zO5xitPWnKpIm12ASsjTQCBqd52ZdvpGQuw==
-  travel-app:clerkPublishableKey:
-    secure: v1:4lDLHGzK+DQwwz/c:cVG/CTEmd4fJbseir7RAZa2Pu8ku9C0y9hGJWAnfqyva/bR8n63f23YTTnjJznd1NLmIASKk+qeYhIKytW8P0OV92/3T9brd7A0+FTgN
-  travel-app:clerkSecretKey:
-    secure: v1:/G1fsnEtJR2SiHKV:DjHa+7Cdaa1ZI8H4cx+opiO/SEDeOP/NtQ/lXyAh77ZzVkcPEeyCZ+CO5PyATNmd17oSsOya/JWVZ9v+FhD/zWJu
   travel-app:keyPairName: travel-app-debug
+  travel-app:openaiApiKey:
+    secure: v1:a5bEUpgCaa5q+bb/:XkXNzpebvCrDI82wURktCwFE04I5ScLCinrPldhCkQdP9BWM6mAMqMy0B3Ww2cWx8EC1zJKc8bUu4mMWwK3k60hOXZdcHl8cAZDWsHxfBzPwebTc0BH0oT6v9d3sIVvPAdZE44qCKNwGWMHL2W2tmz8Yf4BLvD2dnGeHHj6c54LQQxZyRVbEVQWmNXC3RgFoot7O3SNFti4RYnzxrwZhbj6ZT6wWnspynibnARF9SJjnk1EJ
+  travel-app:amadeusApiKey:
+    secure: v1:EWdSI+YplKVF745b:uM39b/1c70oXmwJfTkKoxRjBxTpMI39oOeOGGp3eCbKhjpoUM6XuwmPmnvIUU3mc
+  travel-app:amadeusApiSecret:
+    secure: v1:1QVXpnnvWZReTl9c:l0+Pgdyh40/svA5rxnQR6et8tamaFkkpE5f232Zmn3I=
+  travel-app:googleMapsApiKey:
+    secure: v1:1kUEBtILVlr+wsBH:myApwpeOZNwBMNgKB9/h2RlFNeRgzpWVdEfwRyACgU6yM0EaXV2/smq8sq43/3UDSLu7iHG/3Q==
+  travel-app:unsplashAccessKey:
+    secure: v1:ioSUymSU5QNqZl/0:o7Ryuin4jrRyxBw1/eVo9PUUi63qRttudJj7ezvXRg7jVd+beMIH2pT5wKTGjhYxLyGbwf8I68qC2CM=
+  travel-app:databaseUrl:
+    secure: v1:o4o+TiKOqasVtIMU:dKneFca0OhU2pzljTgvOE2xA5cCWrHzQBL5vLLy8UIwphWkg0/Qu4rcOJV9KFOzum4AVybHJFMxpwpa92uNUMcf9e3BVTYOApFmsvbkQFdqduUK/2x95caJn1HG6QmNob99F3bUs2zM8YsC4uBZzSSxPwd+OJsII1JHep9EszY7Z3Q==
+  travel-app:clerkPublishableKey:
+    secure: v1:/0BWEBLaicefv/s5:ZKf1giB8dwGUhDgfIfvzW+4loe/bZP7cY/aNweTXMQDj8PTM2F8oJ3KwtqNMT/7FCD7o5ztFojMX+PA5OzGMKE+f5SLK6Y2R6XfpaPYZ
+  travel-app:clerkSecretKey:
+    secure: v1:UAb9PqgUusPKXaLe:xLYv0adGkfrnUWOeJxr6EYfMy1LgEax71tRiGJLzetC/Cfo95ue5C1iptiPBlPYthhq8uUrSC21rqCMQ3Wx9BD6K
+encryptionsalt: v1:2TTctn3LIoE=:v1:+UEGmbdaqurwHXaw:H6/JY9EdVg02xhenAn5S+axCKSx3KA==

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Service configuration from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         extra="allow",
         case_sensitive=False,
     )

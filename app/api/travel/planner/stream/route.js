@@ -31,6 +31,10 @@ export async function POST(request) {
           .map(([k]) => k)
       : [];
 
+    // Use AbortController with a 120s timeout for the upstream call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
     const response = await fetch(
       `${AGENTIC_SERVICE_URL}/api/v1/agentic/generate-itinerary-stream`,
       {
@@ -44,8 +48,11 @@ export async function POST(request) {
           preferences: prefsList,
           user_id: userId,
         }),
+        signal: controller.signal,
       },
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({

@@ -335,15 +335,8 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
       setPreviewError(null);
       setIsLoadingPreview(true);
 
-      // Fetch document content with cache busting
-      const cacheBuster = `t=${Date.now()}`;
-      const response = await fetch(`/api/vault/documents/${doc.id}/preview?${cacheBuster}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
+      // Fetch document content
+      const response = await fetch(`/api/vault/documents/${doc.id}/preview`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -351,7 +344,6 @@ const KnowledgeVault = ({ userId, initialDocuments }) => {
       }
 
       const data = await response.json();
-      console.log('Preview data received:', data); // Debug log
       setPreviewContent(data.content);
     } catch (error) {
       console.error("Preview error:", error);
