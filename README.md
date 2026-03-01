@@ -7,232 +7,209 @@
 [![Pulumi](https://img.shields.io/badge/IaC-Pulumi-8A3391?logo=pulumi)](https://www.pulumi.com/)
 [![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?logo=amazon-aws)](https://aws.amazon.com/)
 
-Production-ready, full-stack AI travel platform built with **Next.js 14 + FastAPI + OpenAI + AWS + Pulumi**.
-
-This project is designed to demonstrate senior-level engineering across product UX, AI orchestration, reliability, and cloud deployment.
-
-## 1-minute recruiter skim
-
-- **What it is**: an agentic AI travel platform that generates rich itineraries in real time via SSE streaming.
-- **Why it matters**: demonstrates practical delivery of AI products beyond demos—latency handling, fallback behavior, and production deployment.
-- **What I built**: Next.js frontend, FastAPI AI service, API integration layer (OpenAI + Amadeus + Unsplash), persistence, and AWS IaC.
-- **Engineering depth**: streaming pipelines, async orchestration, structured response normalization, Dockerized services, CloudFront + EC2 deployment.
-- **Hiring signal**: strong end-to-end ownership from product UX to backend performance tuning and cloud operations.
-
-## Why this project is strong for employers
-
-- **Streaming-first AI UX**: users see itinerary generation live via SSE instead of waiting on a spinner.
-- **Performance engineering**: token chunk batching and parallelized backend work reduce perceived latency significantly.
-- **Resilience patterns**: graceful fallback itinerary generation when upstream AI responses are incomplete.
-- **Real API integration**: OpenAI + Amadeus + Unsplash in one pipeline with structured output handling.
-- **Production deployment**: Dockerized services on EC2, HTTPS through CloudFront, infra managed by Pulumi.
-- **Full-stack ownership**: frontend, backend, API contracts, persistence, infra, and operations in one repo.
+A full-stack AI travel platform that generates structured, multi-day itineraries in real time. Built with **Next.js 14**, **FastAPI**, **OpenAI**, and deployed on **AWS** via **Pulumi** IaC.
 
 ---
 
-## Core capabilities
+## Overview
 
-- Generate multi-day travel itineraries with:
-  - day-by-day schedules
-  - real place names and addresses
-  - hotel recommendations
-  - cost breakdowns
-- Real-time progress stream with event phases:
-  - `status`
-  - `chunk`
-  - `result`
-  - `done`
-- Save and revisit generated plans
-- Knowledge Vault support for document-powered travel context
-- Google Maps integration for itinerary visualization
+This application combines a streaming AI backend with a responsive React frontend to produce detailed travel plans — complete with day-by-day schedules, hotel recommendations, real place names, and cost estimates. The architecture is built around real-time interaction patterns rather than static request/response cycles, giving users live feedback as itineraries are generated.
 
 ---
 
-## System architecture
+## Features
+
+- **Streaming itinerary generation** via Server-Sent Events (SSE) — output appears progressively as the model generates it
+- **Multi-day travel plans** with daily schedules, real addresses, hotel suggestions, and budget breakdowns
+- **Saved trips** — persist and revisit previously generated itineraries
+- **Knowledge Vault** — upload documents to inject custom travel context into the model's reasoning
+- **Google Maps integration** for visualizing itinerary locations day-by-day
+- **Graceful fallback behavior** when upstream AI responses are incomplete or malformed
+
+---
+
+## System Architecture
 
 ```text
 Browser (React / Next.js App Router)
-  -> Next.js API routes (proxy + normalization)
-  -> FastAPI agentic service
-  -> OpenAI + Amadeus + Unsplash
-  -> Prisma/Postgres persistence
+  └─> Next.js API routes  (proxy + normalization)
+        └─> FastAPI agentic service
+              └─> OpenAI + Amadeus + Unsplash
+                    └─> Prisma / PostgreSQL  (persistence)
 ```
 
-### Streaming path
+### Streaming flow
 
 1. Frontend posts to `/api/travel/planner/stream`
-2. Next.js proxies to FastAPI `/api/v1/agentic/generate-itinerary-stream`
-3. FastAPI streams SSE events continuously
-4. Frontend renders partial output progressively, then final structured itinerary
+2. Next.js proxies the request to FastAPI `/api/v1/agentic/generate-itinerary-stream`
+3. FastAPI emits SSE events across four phases: `status` → `chunk` → `result` → `done`
+4. Frontend renders partial output progressively, then hydrates the final structured itinerary
 
-### Reliability path
+### Reliability
 
-- If AI output is malformed or incomplete, the app normalizes and/or falls back to a usable itinerary.
-- Docker health checks gate service dependencies (`frontend` depends on healthy `backend`).
+- Malformed or truncated LLM output is normalized at the proxy layer so `daily_plans` always render.
+- Chunk batching in the streaming path reduces event overhead and improves perceived responsiveness.
+- Docker health checks gate `frontend` startup on a healthy `backend` container.
 
 ---
 
-## Tech stack
+## Tech Stack
 
 ### Frontend
 
-- Next.js 14 (App Router)
-- React 18
-- Tailwind CSS + DaisyUI
-- TanStack Query
-- Prisma Client
-- Google Maps (`@react-google-maps/api`)
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router) |
+| UI | React 18, Tailwind CSS, DaisyUI |
+| Data fetching | TanStack Query |
+| ORM client | Prisma Client |
+| Maps | `@react-google-maps/api` |
 
 ### Backend
 
-- FastAPI + Uvicorn
-- Python 3.11
-- OpenAI SDK
-- Async orchestration (`asyncio`)
-- Caching (`cachetools`, optional Redis)
-- Vector tooling (`FAISS`, sentence-transformers)
-- Travel/media APIs: Amadeus, Unsplash
+| Layer | Technology |
+|---|---|
+| API | FastAPI + Uvicorn |
+| Runtime | Python 3.11, asyncio |
+| AI | OpenAI SDK |
+| Vector search | FAISS, sentence-transformers |
+| Caching | cachetools (optional Redis) |
+| External APIs | Amadeus (travel data), Unsplash (imagery) |
 
-### Infra / DevOps
+### Infrastructure
 
-- Docker + Docker Compose
-- AWS EC2 (app hosting)
-- CloudFront (HTTPS edge termination)
-- Nginx reverse proxy on EC2
-- Pulumi (TypeScript IaC)
-
----
-
-## Notable engineering updates
-
-- Switched runtime generation path to local FastAPI backend for richer structured itinerary output.
-- Restored end-to-end streaming UX in frontend + Next.js proxy.
-- Fixed post-stream normalization so `daily_plans` always render correctly.
-- Increased stream timeout handling in proxy to support longer LLM runs.
-- Added chunk batching in planner streaming path to reduce event overhead and improve responsiveness.
-- Added backend container startup command and verified deployment health in Dockerized EC2 runtime.
+| Concern | Technology |
+|---|---|
+| Containerization | Docker + Docker Compose |
+| App hosting | AWS EC2 |
+| Edge / HTTPS | AWS CloudFront |
+| Reverse proxy | Nginx |
+| IaC | Pulumi (TypeScript) |
 
 ---
 
-## Project structure
+## Project Structure
 
 ```text
-app/                       Next.js App Router pages + API routes
-components/                UI and planner components
-agentic-service/           FastAPI service + planner logic + integrations
-infra/pulumi/              AWS infrastructure as code
-prisma/                    DB schema + migrations
-docker-compose.yml         Local/EC2 multi-service runtime
+app/                    Next.js App Router pages and API routes
+components/             React UI and planner components
+agentic-service/        FastAPI service, planner agent, and API integrations
+  agents/               Planner agent and tool definitions
+  services/             Amadeus, Unsplash, caching, and vault integrations
+  data/                 FAISS index and uploaded documents
+infra/pulumi/           AWS infrastructure as code
+prisma/                 Database schema and migrations
+docker-compose.yml      Multi-service local and EC2 runtime
 ```
 
 ---
 
-## Local development
+## Local Development
 
-### 1) Install dependencies
+### 1. Install dependencies
 
 ```bash
+# Frontend
 npm install
-cd agentic-service && pip install -r requirements.txt
+
+# Backend
+cd agentic-service
+pip install -r requirements.txt
 ```
 
-### 2) Configure environment
+### 2. Configure environment
 
-Create:
-- `.env.local` (frontend + app-level vars)
-- `agentic-service/.env` (backend secrets)
+Create `.env.local` in the project root and `agentic-service/.env` for the backend.
 
-Required keys include:
-- `OPENAI_API_KEY`
-- `AMADEUS_API_KEY`
-- `AMADEUS_API_SECRET`
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
-- Clerk keys
-- `DATABASE_URL`
+Required variables:
 
-### 3) Run services
+```env
+# AI / travel APIs
+OPENAI_API_KEY=
+AMADEUS_API_KEY=
+AMADEUS_API_SECRET=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 
-Frontend:
+# Auth (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+
+# Database
+DATABASE_URL=
+```
+
+If targeting a local backend from the frontend:
+
+```env
+AGENTIC_SERVICE_URL=http://localhost:8001
+```
+
+### 3. Start services
+
+**Frontend**
 ```bash
 npm run dev
 ```
 
-Backend:
+**Backend**
 ```bash
 cd agentic-service
 uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-If frontend is targeting local backend, set:
-```env
-AGENTIC_SERVICE_URL=http://localhost:8001
-```
-
 ---
 
-## Docker run
+## Docker
+
+Run the full stack locally with Docker Compose:
 
 ```bash
 docker compose up -d --build
 ```
 
-Services:
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000`
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend | http://localhost:8000 |
 
 ---
 
-## AWS deployment (Pulumi)
+## AWS Deployment (Pulumi)
 
-Infra lives in `infra/pulumi` and provisions:
-- EC2 instance
-- security group
-- Elastic IP
-- CloudFront distribution
-- bootstrapping user-data for Docker runtime and env injection
-
-Typical flow:
+Infrastructure lives in `infra/pulumi/` and provisions an EC2 instance, Elastic IP, security group, and CloudFront distribution. Environment variables are injected via Pulumi secrets at provision time.
 
 ```bash
 cd infra/pulumi
-pulumi config set --secret openaiApiKey "..."
-pulumi config set --secret amadeusApiKey "..."
-pulumi config set --secret amadeusApiSecret "..."
-pulumi config set --secret googleMapsApiKey "..."
+
+pulumi config set --secret openaiApiKey        "..."
+pulumi config set --secret amadeusApiKey       "..."
+pulumi config set --secret amadeusApiSecret    "..."
+pulumi config set --secret googleMapsApiKey    "..."
 pulumi config set --secret clerkPublishableKey "..."
-pulumi config set --secret clerkSecretKey "..."
+pulumi config set --secret clerkSecretKey      "..."
+
 pulumi up
 ```
 
 ---
 
-## API endpoints (backend)
+## Backend API Reference
 
-- `GET /` service status
-- `POST /api/v1/agentic/generate-itinerary`
-- `POST /api/v1/agentic/generate-itinerary-stream`
-- `POST /api/v1/agentic/refine-itinerary`
-- `GET /api/v1/cache/stats`
-
----
-
-## What this demonstrates technically
-
-- Building AI products with **real-time interaction patterns** instead of static request/response UX
-- Designing **fault-tolerant LLM systems** that degrade gracefully
-- Operating a **polyglot production stack** (TypeScript + Python)
-- Delivering **cloud infrastructure as code** with reproducible environments
-- Executing **end-to-end debugging and performance tuning** across frontend, backend, and infra
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET`  | `/` | Service health check |
+| `POST` | `/api/v1/agentic/generate-itinerary` | Generate a full itinerary (blocking) |
+| `POST` | `/api/v1/agentic/generate-itinerary-stream` | Generate with SSE streaming |
+| `POST` | `/api/v1/agentic/refine-itinerary` | Refine an existing itinerary |
+| `GET`  | `/api/v1/cache/stats` | Cache diagnostics |
 
 ---
 
-## Portfolio-ready positioning
+## Recent Changes
 
-If you are a hiring manager, this repository reflects practical ability to:
-
-- ship AI features that users can trust
-- diagnose and resolve production issues quickly
-- design for latency, reliability, and maintainability
-- own product delivery from local prototype to deployed cloud system
-
-This is not a toy LLM demo; it is an engineered, deployable AI application.
+- Switched the generation path to local FastAPI backend for richer structured output
+- Restored end-to-end SSE streaming across frontend and Next.js proxy
+- Fixed post-stream normalization so `daily_plans` always hydrate correctly
+- Increased proxy stream timeout to accommodate longer model runs
+- Added chunk batching in the planner streaming path to reduce event overhead
+- Verified Dockerized EC2 deployment with backend startup command and health checks
