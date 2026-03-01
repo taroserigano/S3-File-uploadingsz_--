@@ -10,7 +10,7 @@
 [![Pulumi](https://img.shields.io/badge/IaC-Pulumi-8A3391?logo=pulumi)](https://www.pulumi.com/)
 [![AWS](https://img.shields.io/badge/Cloud-AWS-232F3E?logo=amazon-aws)](https://aws.amazon.com/)
 
-A production-deployed, multi-agent AI travel platform. A **LangGraph state machine** coordinates specialist agents — researcher, logistics planner, compliance checker, experience curator — each powered by **LangChain + OpenAI GPT-4o**, augmented by **FAISS RAG**, and streaming results live to the user via SSE. Built on **Next.js 14 + FastAPI**, containerized with Docker, and deployed on **AWS EC2 + CloudFront** via **Pulumi IaC**.
+A production-deployed, multi-agent AI travel platform. A **LangGraph state machine** coordinates specialist agents — researcher, logistics planner, compliance checker, experience curator — each powered by **LangChain + OpenAI GPT**, augmented by **FAISS RAG**, and streaming results live to the user via SSE. Built on **Next.js 14 + FastAPI**, containerized with Docker, and deployed on **AWS EC2 + CloudFront** via **Pulumi IaC**.
 
 <img width="3810" height="1831" alt="image" src="https://github.com/user-attachments/assets/b7ca206d-4cb7-413f-b41d-1fc86c9eb252" />
 <img width="3769" height="1842" alt="image" src="https://github.com/user-attachments/assets/da24d9e5-e5e8-4ee3-919f-4ad9792d5158" />
