@@ -33,9 +33,7 @@ This application combines a streaming AI backend with a responsive React fronten
 - **Streaming itinerary generation** via Server-Sent Events (SSE) — output appears progressively as the model generates it
 - **Multi-day travel plans** with daily schedules, real addresses, hotel suggestions, and budget breakdowns
 - **Saved trips** — persist and revisit previously generated itineraries
-- **Knowledge Vault** — upload documents to inject custom travel context into the model's reasoning
 - **Google Maps integration** for visualizing itinerary locations day-by-day
-- **Graceful fallback behavior** when upstream AI responses are incomplete or malformed
 
 ---
 
