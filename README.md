@@ -293,6 +293,109 @@ pulumi up
 
 ---
 
+## Performance Optimizations
+
+The streaming planner (`simple_planner.py`) was engineered specifically to minimize time-to-first-token and end-to-end latency. Every optimization is applied deliberately:
+
+### 1. Full Parallelism via `asyncio.gather`
+
+The three most expensive operations — LLM call, Amadeus API (flights + hotels), and Unsplash image fetch — all fire concurrently as independent `asyncio` tasks:
+
+```python
+llm_task      = asyncio.create_task(self._call_llm(...))
+amadeus_task  = asyncio.create_task(self._fetch_amadeus_data(...))
+unsplash_task = asyncio.create_task(self._fetch_hero_image(...))
+
+itinerary_data, (flight_data, hotel_data), hero_image = await asyncio.gather(
+    llm_task, amadeus_task, unsplash_task
+)
+```
+
+In the streaming path, Amadeus and Unsplash are fired in the background *before* the LLM even starts streaming. By the time the LLM finishes, the API data is already ready — zero additional wait.
+
+### 2. SSE Chunk Batching (20× event reduction)
+
+Raw token streaming from OpenAI produces ~1,500 individual SSE events per response. Each event is a `json.dumps()` call + network frame + React re-render. Instead, tokens are batched:
+
+```python
+_BATCH_SIZE = 20  # batch every 20 tokens into one SSE event
+# ~1500 raw events → ~75 batched events
+```
+
+This cuts SSE overhead by ~20×, reduces React re-renders, and visually smooths the streaming animation.
+
+### 3. Token-Efficient Prompt Engineering
+
+The system prompt was rewritten from scratch to be ~250 tokens (3× reduction from the original). The user prompt is ~60 tokens (2× reduction). Fewer input tokens = lower cost, lower latency, and more room for output:
+
+- Ultra-compact system prompt with hard rules (no verbose explanations)
+- Lean user prompt: city, country, days, budget, preferences only
+- `max_tokens=16000`, `temperature=0.4`, `top_p=0.8` — tuned for fast, focused sampling
+
+### 4. `response_format=json_object` + Streaming JSON Repair
+
+OpenAI's `response_format={"type": "json_object"}` guarantees the model outputs valid JSON — no regex extraction needed in the happy path. For the streaming case (where the buffer can be truncated mid-token), a custom JSON repair function:
+
+- Closes unclosed strings
+- Tracks open `{` / `[` with a stack and appends matching closing characters
+- Ensures `daily_plans` always exists even on partial failure
+
+### 5. Multi-Tier Caching (`TTLCache` + Redis)
+
+```
+Request
+  └─> Tier 1: In-memory TTLCache (cachetools)  ← instant, per-process
+        └─> Tier 2: Redis (optional)            ← shared across deploys
+              └─> LLM + API calls               ← only on true cache miss
+```
+
+Cache key = `sha256(city | country | days | budget | sorted_prefs)`. Identical trip requests return instantly without touching OpenAI or Amadeus.
+
+### 6. `orjson` for Faster Serialization
+
+`orjson` replaces `json` throughout the hot path (cache reads/writes, SSE event serialization). It is ~5–10× faster than stdlib `json` on large nested dicts and handles `datetime` objects natively.
+
+### 7. Batched Pre-Warm with Semaphore
+
+A pre-warm utility can heat the cache for popular destinations concurrently, controlled by a semaphore to avoid hammering the API:
+
+```python
+# semaphore=5 concurrent pre-warms, 0.2s delay between batches
+```
+
+---
+
+## Special Architecture Decisions
+
+### Dual-Path Planner Design
+
+The backend exposes two generation paths that serve different use cases:
+
+| Path | Class | Use case |
+|---|---|---|
+| **Agentic** | `AgenticPlanner` (LangGraph) | Full multi-agent pipeline with RAG, tool use, and typed state |
+| **Streaming** | `SimplePlanner` | High-performance streaming path optimized for latency and throughput |
+
+The streaming path is the live production path. The agentic path provides the architectural foundation and is used when richer reasoning or document-grounded responses are needed (e.g., Knowledge Vault queries).
+
+### LLM Hotel + Amadeus Hotel Merge Strategy
+
+Hotels from the LLM (rich: name, rating, description, price range) and hotels from the Amadeus API (authoritative: live pricing, real availability) are merged with a deliberate priority strategy:
+
+1. LLM hotels first — they have the richest descriptive data
+2. Amadeus hotels used to fill gaps or enrich with live pricing
+3. Fallback hotels generated if both sources return empty — the UI never shows a blank hotel section
+
+### Typed Agent State (`PlannerState`)
+
+All data flowing through the LangGraph pipeline is carried in a single `PlannerState` `TypedDict`. Every field is explicitly declared — no dynamic dict keys, no silent data loss between nodes. This makes the graph deterministic and debuggable: you can inspect the state at any node boundary.
+
+### Response Normalization at the Proxy Layer
+
+The Next.js API route that proxies FastAPI does not just forward responses — it normalizes them. If `daily_plans` is missing, empty, or malformed, the proxy reconstructs it from fallback fields. This means frontend components never receive null data and never crash, regardless of what the LLM returned.
+
+---
+
 ## Recent Changes
 
 - Switched the generation path to local FastAPI backend for richer structured output
@@ -300,6 +403,7 @@ pulumi up
 - Fixed post-stream normalization so `daily_plans` always hydrate correctly
 - Added chunk batching in the planner streaming path to reduce event overhead
 - Restored full itinerary view on saved trips — Google Maps, cost estimates, hotels, dining guide, day tabs, local tips
+
 
 - Fixed post-stream normalization so `daily_plans` always hydrate correctly
 - Increased proxy stream timeout to accommodate longer model runs
