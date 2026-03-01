@@ -9,6 +9,17 @@
 
 A full-stack AI travel platform that generates structured, multi-day itineraries in real time. Built with **Next.js 14**, **FastAPI**, **OpenAI**, and deployed on **AWS** via **Pulumi** IaC.
 
+<img width="3810" height="1831" alt="image" src="https://github.com/user-attachments/assets/b7ca206d-4cb7-413f-b41d-1fc86c9eb252" />
+<img width="3769" height="1842" alt="image" src="https://github.com/user-attachments/assets/da24d9e5-e5e8-4ee3-919f-4ad9792d5158" />
+
+<img width="3786" height="1861" alt="image" src="https://github.com/user-attachments/assets/da0fc521-cb5c-4b25-a4b1-084e3f4afb2f" />
+<img width="3785" height="1858" alt="image" src="https://github.com/user-attachments/assets/27b9194e-976e-4f14-a52d-d8fff2d46090" />
+<img width="3787" height="2148" alt="image" src="https://github.com/user-attachments/assets/6db7c6e4-abb2-49f1-8ab4-bf9979507cc0" />
+
+<img width="3799" height="1883" alt="image" src="https://github.com/user-attachments/assets/00f09f95-37df-463f-a37b-24e146e1e044" />
+
+
+
 ---
 
 ## Overview
